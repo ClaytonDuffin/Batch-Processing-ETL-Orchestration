@@ -10,9 +10,39 @@ load_dotenv()
 # Insert to PostgreSQL using ON CONFLICT DO NOTHING syntax, to avoid duplicate inserts.
 # Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG.
 
-def harvestEIA930FormData(endpoint, errorMessage):
+def harvestEIA930FormDataReferenceTables():
     
-    url = f"https://api.eia.gov/v2/electricity/rto/{endpoint}/data/"
+    url = 'https://www.eia.gov/electricity/930-content/EIA930_Reference_Tables.xlsx'
+    lastModifiedHeader = requests.head(url).headers.get('Last-Modified')
+    cacheFile = 'EIA930ReferenceTablesCache.pkl'
+    lastModifiedTimeFile = 'LastModifiedTime.txt'
+
+    if not os.path.exists(lastModifiedTimeFile):
+        with open(lastModifiedTimeFile, 'w') as f:
+            f.write('')
+
+    with open(lastModifiedTimeFile, 'r') as f:
+        lastModifiedCached = f.read().strip()
+
+    if lastModifiedHeader == lastModifiedCached:
+        with open(cacheFile, 'rb') as f:
+            return pickle.load(f)
+
+    selectedSheets = pd.read_excel(url, sheet_name=['BAs', 'Energy Sources'])
+    referenceTables = {'balancingAuthorities': selectedSheets['BAs'].iloc[:, :6], 'energySources': selectedSheets['Energy Sources']}
+
+    with open(cacheFile, 'wb') as f:
+        pickle.dump(referenceTables, f)
+
+    with open(lastModifiedTimeFile, 'w') as f:
+        f.write(lastModifiedHeader)
+
+    return referenceTables
+
+
+def harvestEIA930FormData(endPoint, errorMessage):
+    
+    url = f"https://api.eia.gov/v2/electricity/rto/{endPoint}/data/"
     params = {
         'frequency': 'hourly',
         'data[0]': 'value',
@@ -48,33 +78,6 @@ def harvestHourlyDemandInterchangeAndGenerationData():
 def harvestHourlyInterchangeByNeighboringBA():
     
     return harvestEIA930FormData("interchange-data", "Unable to harvest data for 'Daily Interchange Between Neighboring Balancing Authorities.'")
-
-
-def harvestEIA930FormDataReferenceTables():
-
-    url = 'https://www.eia.gov/electricity/930-content/EIA930_Reference_Tables.xlsx'
-    cacheFile = 'EIA930ReferenceTablesCache.pkl'
-    lastModifiedTimeFile = 'LastModifiedTime.txt'
-
-    lastModifiedHeader = requests.head(url).headers.get('Last-Modified')
-
-    with open(lastModifiedTimeFile, 'r') as f:
-        lastModifiedCached = f.read().strip()
-    
-    if lastModifiedHeader == lastModifiedCached:
-        with open(cacheFile, 'rb') as f:
-            return pickle.load(f)
-
-    selectedSheets = pd.read_excel(url, sheet_name=['BAs', 'Energy Sources'])
-    referenceTables = {'balancingAuthorities': selectedSheets['BAs'].iloc[:, :6], 'energySources': selectedSheets['Energy Sources']}
-
-    with open(cacheFile, 'wb') as f:
-        pickle.dump(referenceTables, f)
-
-    with open(lastModifiedTimeFile, 'w') as f:
-        f.write(lastModifiedHeader)
-
-    return referenceTables
 
 
 def cleanHourlyData(hourlyData,
@@ -126,10 +129,10 @@ def computeHourlyStatsByResponseType(cleanedData):
 
 
 # extract
+hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()
 hourlyNetGenerationData = harvestHourlyNetGenerationBySourceData()
 hourlyDemandInterchangeAndGenerationData = harvestHourlyDemandInterchangeAndGenerationData()
 hourlyInterchangeByNeighboringBA = harvestHourlyInterchangeByNeighboringBA()
-hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()
 
 # transform
 cleanedHourlyNetGenerationData = cleanHourlyData(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)
