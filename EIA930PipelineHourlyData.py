@@ -40,9 +40,9 @@ def harvestEIA930FormDataReferenceTables():
     return referenceTables
 
 
-def harvestEIA930FormData(endPoint, errorMessage):
+def harvestEIA930FormData(endpoint, errorMessage):
     
-    url = f"https://api.eia.gov/v2/electricity/rto/{endPoint}/data/"
+    url = f"https://api.eia.gov/v2/electricity/rto/{endpoint}/data/"
     params = {
         'frequency': 'hourly',
         'data[0]': 'value',
