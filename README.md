@@ -17,4 +17,4 @@ Due to the nature of the data sources, pipelines will need to extract data at va
 
 ## Visualization Samples <a name = "vissam"></a>
 ![HourlyNetGenerationByEnergySource](https://github.com/user-attachments/assets/faea6447-a6e9-48b6-ab4d-0c27a510f207)
-![ForecastedDemandVSActualDemand](https://github.com/user-attachments/assets/59e3af22-b220-4114-82a2-0fbe09ab9e37)
+![ActualDemandVSForecastedDemand](https://github.com/user-attachments/assets/08c9c870-efc0-4c99-b39b-c505de62ccb5)
