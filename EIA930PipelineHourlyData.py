@@ -8,7 +8,7 @@ load_dotenv()
 
 # TODO
 # Insert to PostgreSQL using ON CONFLICT DO NOTHING syntax, to avoid duplicate inserts.
-# Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG. DAG runs daily.
+# Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG. DAG runs once per day.
 
 def harvestEIA930FormDataReferenceTables():
     
@@ -41,9 +41,7 @@ def harvestEIA930FormDataReferenceTables():
 
 
 def harvestEIA930FormData(endpoint, errorMessage, offset):
-    
-    # API lags about a day and a half.
-    
+        
     url = f"https://api.eia.gov/v2/electricity/rto/{endpoint}/data/"
     twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
     
@@ -79,7 +77,7 @@ def paginationCycler(endpoint, errorMessage):
             dataJSON = harvestEIA930FormData(endpoint, errorMessage, offset)
             allCalls.append(dataJSON)
             
-            if dataJSON['response']['data'][0]['period'] > yesterday:
+            if dataJSON['response']['data'][-1]['period'] > yesterday:
                 break
             
             if len(dataJSON['response']['data']) == 0:
@@ -88,7 +86,7 @@ def paginationCycler(endpoint, errorMessage):
             offset += 5000
         
         except Exception as e:
-            raise Exception(f"Error occurred for offset {offset} in paginationCycler: {e}")
+            raise Exception(f"Error occurred for offset {offset}, endpoint {endpoint}, in paginationCycler: {e}")
 
     return allCalls
 
@@ -159,4 +157,3 @@ transformedHourlyStatsByResponseType = computeHourlyStatsByResponseType(cleanedH
 
 # load
 
-    
