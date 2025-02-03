@@ -1,14 +1,14 @@
+import os
 import requests
+from datetime import datetime, timedelta
 import pandas as pd
 from dotenv import load_dotenv
-import os
 import pickle
 load_dotenv()
 
 # TODO
-# Use offset to pull 24+ hours' worth for each harvester at 1am, every day. Process sets to contain full 24 hour day prior to transforming and loading.
 # Insert to PostgreSQL using ON CONFLICT DO NOTHING syntax, to avoid duplicate inserts.
-# Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG.
+# Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG. DAG runs daily.
 
 def harvestEIA930FormDataReferenceTables():
     
@@ -40,17 +40,20 @@ def harvestEIA930FormDataReferenceTables():
     return referenceTables
 
 
-def harvestEIA930FormData(endpoint, errorMessage):
+def harvestEIA930FormData(endpoint, errorMessage, offset):
+    
+    # API lags about a day and a half.
     
     url = f"https://api.eia.gov/v2/electricity/rto/{endpoint}/data/"
+    twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
+    
     params = {
         'frequency': 'hourly',
         'data[0]': 'value',
-        'start': '2025-01-31T00',
-        'end': '2025-02-01T00',
+        'start': twoDaysAgo,
         'sort[0][column]': 'period',
         'sort[0][direction]': 'asc',
-        'offset': '0',
+        'offset': offset,
         'length': '5000',
         'api_key': os.getenv("EIA_API_KEY")
     }
@@ -63,76 +66,87 @@ def harvestEIA930FormData(endpoint, errorMessage):
         return data
     
     raise Exception(errorMessage)
+
+
+def paginationCycler(endpoint, errorMessage):
+
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT00')
+    allCalls = []
+    offset = 0
     
+    while True:
+        try:
+            dataJSON = harvestEIA930FormData(endpoint, errorMessage, offset)
+            allCalls.append(dataJSON)
+            
+            if dataJSON['response']['data'][0]['period'] > yesterday:
+                break
+            
+            if len(dataJSON['response']['data']) == 0:
+                break
+        
+            offset += 5000
+        
+        except Exception as e:
+            raise Exception(f"Error occurred for offset {offset} in paginationCycler: {e}")
 
-def harvestHourlyNetGenerationBySourceData():
+    return allCalls
+
+
+def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
     
-    return harvestEIA930FormData("fuel-type-data", "Unable to harvest data for 'Hourly Net Generation by Balancing Authority and Energy Source.'")
-
-
-def harvestHourlyDemandInterchangeAndGenerationData():
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT00')
     
-    return harvestEIA930FormData("region-data", "Unable to harvest data for 'Hourly Demand, Day-Ahead Demand Forecast, Net Generation, and Interchange by Balancing Authority.'")
-
-
-def harvestHourlyInterchangeByNeighboringBA():
+    combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True))
+    combinedData['period'] = pd.to_datetime(combinedData['period'], errors='coerce')
+    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT00') == yesterday].index[0] + 1][:-1]
     
-    return harvestEIA930FormData("interchange-data", "Unable to harvest data for 'Daily Interchange Between Neighboring Balancing Authorities.'")
-
-
-def cleanHourlyData(hourlyData,
-                    hourlyEIA930FormDataReferenceTables):
-    
-    filteredData = (pd.DataFrame(hourlyData['response']['data'])
-                    .loc[lambda df: df['respondent' if 'respondent' in df.columns else 'fromba']
-                         .isin(hourlyEIA930FormDataReferenceTables['balancingAuthorities']['BA Code'])]
-                    .reset_index(drop=True))
+    filteredData = (dataSubset
+                    .pipe(lambda df: df[df['respondent' if 'respondent' in df.columns else 'fromba']
+                                        .isin(hourlyEIA930FormDataReferenceTables['balancingAuthorities']['BA Code'])]).reset_index(drop=True))
 
     return filteredData
 
 
 def computeHourlyNetGenerationByEnergySource(cleanedData):
-
+    
     aggregatedEnergySourceData = (cleanedData
-                                  .assign(value=pd.to_numeric(cleanedData['value'], errors='coerce'))
-                                  .groupby(['period', 'fueltype'], as_index=False)['value']
-                                  .sum()
-                                  .sort_values(by=['period', 'fueltype']))
-
+                                  .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
+                                  .pipe(lambda df: df.groupby(['period', 'fueltype'], as_index=False)['value'].sum())
+                                  .pipe(lambda df: df.sort_values(by=['period', 'fueltype'])))
+    
     return aggregatedEnergySourceData
 
 
 def computeHourlyRespondentsProducingAndGenerating(cleanedData):
     
     hourlyRespondentsProducingAndGenerating = (cleanedData
-                                               .assign(value=pd.to_numeric(cleanedData['value'], errors='coerce'))
-                                               .groupby(['period', 'respondent', 'respondent-name', 'type'], as_index=False)['value']
-                                               .sum()
-                                               .pivot_table(index=['period', 'respondent', 'respondent-name'], columns='type', values='value', aggfunc='sum')
-                                               .dropna()
-                                               .reset_index()
-                                               .sort_values(by=['period', 'respondent']))
-
+                                               .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
+                                               .pipe(lambda df: df.groupby(['period', 'respondent', 'respondent-name', 'type'], as_index=False)['value'].sum())
+                                               .pipe(lambda df: df.pivot_table(index=['period', 'respondent', 'respondent-name'], columns='type', values='value', aggfunc='sum'))
+                                               .pipe(lambda df: df.dropna())
+                                               .pipe(lambda df: df.reset_index())
+                                               .pipe(lambda df: df.sort_values(by=['period', 'respondent'])))
+    
     return hourlyRespondentsProducingAndGenerating
 
 
 def computeHourlyStatsByResponseType(cleanedData):
     
     aggregatedResponseTypeData = (cleanedData
-                                  .assign(value=pd.to_numeric(cleanedData['value'], errors='coerce'))
-                                  .groupby(['period', 'type'], as_index=False)['value']
-                                  .sum()
-                                  .pivot_table(index='period', columns='type', values='value', aggfunc='sum')
-                                  .reset_index())
+                                  .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
+                                  .pipe(lambda df: df.groupby(['period', 'type'], as_index=False)['value'].sum())
+                                  .pipe(lambda df: df.pivot_table(index='period', columns='type', values='value', aggfunc='sum'))
+                                  .pipe(lambda df: df.reset_index()))
 
     return aggregatedResponseTypeData
 
 
 # extract
 hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()
-hourlyNetGenerationData = harvestHourlyNetGenerationBySourceData()
-hourlyDemandInterchangeAndGenerationData = harvestHourlyDemandInterchangeAndGenerationData()
-hourlyInterchangeByNeighboringBA = harvestHourlyInterchangeByNeighboringBA()
+hourlyNetGenerationData = paginationCycler("fuel-type-data", "Unable to harvest data for 'Hourly Net Generation by Balancing Authority and Energy Source.'")
+hourlyDemandInterchangeAndGenerationData = paginationCycler("region-data", "Unable to harvest data for 'Hourly Demand, Day-Ahead Demand Forecast, Net Generation, and Interchange by Balancing Authority.'")
+hourlyInterchangeByNeighboringBA = paginationCycler("interchange-data", "Unable to harvest data for 'Daily Interchange Between Neighboring Balancing Authorities.'")
 
 # transform
 cleanedHourlyNetGenerationData = cleanHourlyData(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)
@@ -145,4 +159,4 @@ transformedHourlyStatsByResponseType = computeHourlyStatsByResponseType(cleanedH
 
 # load
 
-
+    
