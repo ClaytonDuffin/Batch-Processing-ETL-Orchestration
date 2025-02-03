@@ -2,7 +2,7 @@
 + [Project Overview](#proove)
 + [Orchestration Requirement](#orcreq)		
 + [Pipeline Architecture](#piparc)
-+ [Visualization Samples](#vissam)
++ [Visualization Sample](#vissam)
 
 ## Project Overview <a name = "proove"></a>
 
@@ -15,6 +15,5 @@ Due to the nature of the data sources, pipelines will need to extract data at va
 ## Pipeline Architecture <a name = "piparc"></a>
 ![PipelineArchitecture](https://github.com/user-attachments/assets/c2f5e4c0-cd6e-44a9-92b2-d0dca3a756e4)
 
-## Visualization Samples <a name = "vissam"></a>
+## Visualization Sample <a name = "vissam"></a>
 ![HourlyNetGenerationByEnergySource](https://github.com/user-attachments/assets/faea6447-a6e9-48b6-ab4d-0c27a510f207)
-![ActualDemandVSForecastedDemand](https://github.com/user-attachments/assets/08c9c870-efc0-4c99-b39b-c505de62ccb5)
