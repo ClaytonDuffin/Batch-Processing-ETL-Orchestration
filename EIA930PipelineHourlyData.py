@@ -1,15 +1,16 @@
 import os
-import requests
+import re
 from datetime import datetime, timedelta
+import pickle
+import requests
 import pandas as pd
 from dotenv import load_dotenv
-import pickle
 import psycopg2
 from psycopg2.extras import execute_values
+from airflow import DAG
+from airflow.operators.python import PythonOperator
 load_dotenv()
 
-# TODO
-# Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG. DAG runs once per day.
 
 def harvestEIA930FormDataReferenceTables():
     
@@ -141,6 +142,19 @@ def computeHourlyStatsByResponseType(cleanedData):
     return aggregatedResponseTypeData
 
 
+def renameColumnsToSnakeCase(*transformedDataFrames):
+    
+    def toSnakeCase(colName):
+        colName = re.sub(r'[-\s]+', '_', colName)
+        colName = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', colName)
+        return colName.lower()
+
+    for transformedData in transformedDataFrames:
+        transformedData.columns = [toSnakeCase(col) for col in transformedData.columns]
+
+    return transformedDataFrames
+
+
 def loadToPostgreSQL(tableName, transformedData):
     
     columnNames = transformedData.columns.tolist()
@@ -171,21 +185,120 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.close()
 
 
-# extract
-hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()
-hourlyNetGenerationData = paginationCycler("fuel-type-data", "Unable to harvest data for 'Hourly Net Generation by Balancing Authority and Energy Source.'")
-hourlyDemandInterchangeAndGenerationData = paginationCycler("region-data", "Unable to harvest data for 'Hourly Demand, Day-Ahead Demand Forecast, Net Generation, and Interchange by Balancing Authority.'")
-hourlyInterchangeByNeighboringBA = paginationCycler("interchange-data", "Unable to harvest data for 'Daily Interchange Between Neighboring Balancing Authorities.'")
+def extractTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
 
-# transform
-cleanedHourlyNetGenerationData = cleanHourlyData(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)
-cleanedHourlyDemandInterchangeAndGenerationData = cleanHourlyData(hourlyDemandInterchangeAndGenerationData, hourlyEIA930FormDataReferenceTables)
-cleanedHourlyInterchangeByNeighboringBA = cleanHourlyData(hourlyInterchangeByNeighboringBA, hourlyEIA930FormDataReferenceTables)
+    hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()  
+    hourlyNetGenerationData = paginationCycler("fuel-type-data", "Unable to harvest data for 'Hourly Net Generation by Balancing Authority and Energy Source.'")  
+    hourlyDemandInterchangeAndGenerationData = paginationCycler("region-data", "Unable to harvest data for 'Hourly Demand, Day-Ahead Demand Forecast, Net Generation, and Interchange by Balancing Authority.'")  
+    hourlyInterchangeByNeighboringBA = paginationCycler("interchange-data", "Unable to harvest data for 'Daily Interchange Between Neighboring Balancing Authorities.'")  
 
-transformedHourlyNetGenerationByEnergySource = computeHourlyNetGenerationByEnergySource(cleanedHourlyNetGenerationData)
-transformedHourlyRespondentsProducingAndGenerating = computeHourlyRespondentsProducingAndGenerating(cleanedHourlyDemandInterchangeAndGenerationData)
-transformedHourlyStatsByResponseType = computeHourlyStatsByResponseType(cleanedHourlyDemandInterchangeAndGenerationData)
+    taskInstance.xcom_push(key='hourlyEIA930FormDataReferenceTables', value=hourlyEIA930FormDataReferenceTables)  
+    taskInstance.xcom_push(key='hourlyNetGenerationData', value=hourlyNetGenerationData)  
+    taskInstance.xcom_push(key='hourlyDemandInterchangeAndGenerationData', value=hourlyDemandInterchangeAndGenerationData)  
+    taskInstance.xcom_push(key='hourlyInterchangeByNeighboringBA', value=hourlyInterchangeByNeighboringBA)  
 
-# load
-loadToPostgreSQL('EIA930_hourly_statistics_by_response_type', transformedHourlyStatsByResponseType)
+
+def transformTask(**kwargs):  
+
+    taskInstance = kwargs['ti']  
+
+    hourlyEIA930FormDataReferenceTables = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyEIA930FormDataReferenceTables')  
+    hourlyNetGenerationData = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyNetGenerationData')  
+    hourlyDemandInterchangeAndGenerationData = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyDemandInterchangeAndGenerationData')  
+    hourlyInterchangeByNeighboringBA = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyInterchangeByNeighboringBA')  
+
+    cleanedHourlyNetGenerationData = cleanHourlyData(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)  
+    cleanedHourlyDemandInterchangeAndGenerationData = cleanHourlyData(hourlyDemandInterchangeAndGenerationData, hourlyEIA930FormDataReferenceTables)  
+    cleanedHourlyInterchangeByNeighboringBA = cleanHourlyData(hourlyInterchangeByNeighboringBA, hourlyEIA930FormDataReferenceTables)  
+
+    transformedHourlyNetGenerationByEnergySource = computeHourlyNetGenerationByEnergySource(cleanedHourlyNetGenerationData)  
+    transformedHourlyRespondentsProducingAndGenerating = computeHourlyRespondentsProducingAndGenerating(cleanedHourlyDemandInterchangeAndGenerationData)  
+    transformedHourlyStatsByResponseType = computeHourlyStatsByResponseType(cleanedHourlyDemandInterchangeAndGenerationData)  
+
+    balancingAuthorities, energySources = renameColumnsToSnakeCase(  
+        hourlyEIA930FormDataReferenceTables['balancingAuthorities'],  
+        hourlyEIA930FormDataReferenceTables['energySources']  
+    )  
+
+    cleanedHourlyNetGenerationData, cleanedHourlyDemandInterchangeAndGenerationData, cleanedHourlyInterchangeByNeighboringBA = renameColumnsToSnakeCase(  
+        cleanedHourlyNetGenerationData,  
+        cleanedHourlyDemandInterchangeAndGenerationData,  
+        cleanedHourlyInterchangeByNeighboringBA  
+    )  
+
+    transformedHourlyNetGenerationByEnergySource, transformedHourlyRespondentsProducingAndGenerating, transformedHourlyStatsByResponseType = renameColumnsToSnakeCase(  
+        transformedHourlyNetGenerationByEnergySource,  
+        transformedHourlyRespondentsProducingAndGenerating,  
+        transformedHourlyStatsByResponseType  
+    )  
+
+    taskInstance.xcom_push(key='balancingAuthorities', value=balancingAuthorities)  
+    taskInstance.xcom_push(key='energySources', value=energySources)  
+    taskInstance.xcom_push(key='cleanedHourlyNetGenerationData', value=cleanedHourlyNetGenerationData)  
+    taskInstance.xcom_push(key='cleanedHourlyDemandInterchangeAndGenerationData', value=cleanedHourlyDemandInterchangeAndGenerationData)  
+    taskInstance.xcom_push(key='cleanedHourlyInterchangeByNeighboringBA', value=cleanedHourlyInterchangeByNeighboringBA)  
+    taskInstance.xcom_push(key='transformedHourlyNetGenerationByEnergySource', value=transformedHourlyNetGenerationByEnergySource)  
+    taskInstance.xcom_push(key='transformedHourlyRespondentsProducingAndGenerating', value=transformedHourlyRespondentsProducingAndGenerating)  
+    taskInstance.xcom_push(key='transformedHourlyStatsByResponseType', value=transformedHourlyStatsByResponseType)  
+
+
+def loadTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+
+    balancingAuthorities = taskInstance.xcom_pull(task_ids='transformTask', key='balancingAuthorities')  
+    energySources = taskInstance.xcom_pull(task_ids='transformTask', key='energySources')  
+    cleanedHourlyNetGenerationData = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedHourlyNetGenerationData')  
+    cleanedHourlyDemandInterchangeAndGenerationData = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedHourlyDemandInterchangeAndGenerationData')  
+    cleanedHourlyInterchangeByNeighboringBA = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedHourlyInterchangeByNeighboringBA')  
+    transformedHourlyNetGenerationByEnergySource = taskInstance.xcom_pull(task_ids='transformTask', key='transformedHourlyNetGenerationByEnergySource')  
+    transformedHourlyRespondentsProducingAndGenerating = taskInstance.xcom_pull(task_ids='transformTask', key='transformedHourlyRespondentsProducingAndGenerating')  
+    transformedHourlyStatsByResponseType = taskInstance.xcom_pull(task_ids='transformTask', key='transformedHourlyStatsByResponseType')  
+
+    loadToPostgreSQL('EIA930_balancing_authorities', balancingAuthorities)  
+    loadToPostgreSQL('EIA930_energy_sources', energySources)  
+    loadToPostgreSQL('EIA930_cleaned_hourly_net_generation', cleanedHourlyNetGenerationData)  
+    loadToPostgreSQL('EIA930_cleaned_hourly_demand_interchange_generation', cleanedHourlyDemandInterchangeAndGenerationData)  
+    loadToPostgreSQL('EIA930_cleaned_hourly_interchange_by_neighboring_BA', cleanedHourlyInterchangeByNeighboringBA)  
+    loadToPostgreSQL('EIA930_hourly_net_generation_by_energy_source', transformedHourlyNetGenerationByEnergySource)  
+    loadToPostgreSQL('EIA930_hourly_respondents_producing_and_generating', transformedHourlyRespondentsProducingAndGenerating)  
+    loadToPostgreSQL('EIA930_hourly_statistics_by_response_type', transformedHourlyStatsByResponseType)  
+
+
+dagEIA930HourlyData = DAG(
+    'EIA930PipelineHourlyData',
+    default_args={
+        'owner': 'airflow',
+        'start_date': datetime(2025, 1, 31),
+        'retries': 2,
+        'retry_delay': timedelta(minutes=15)},
+    description='DAG to extract, transform, and load EIA-930 form hourly data, and EIA-930 form reference tables. Scheduled to run once per day.',
+    schedule_interval=timedelta(days=1),
+    catchup=False)
+
+
+extract = PythonOperator(
+    task_id='EIA930Extract',
+    python_callable=extractTask,
+    provide_context=True,
+    dag=dagEIA930HourlyData)
+
+
+transform = PythonOperator(
+    task_id='EIA930Transform',
+    python_callable=transformTask,
+    provide_context=True,
+    dag=dagEIA930HourlyData)
+
+
+load = PythonOperator(
+    task_id='EIA930Load',
+    python_callable=loadTask,
+    provide_context=True,
+    dag=dagEIA930HourlyData)
+
+
+extract >> transform >> load
 
