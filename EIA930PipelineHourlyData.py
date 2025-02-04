@@ -153,14 +153,14 @@ def loadToPostgreSQL(tableName, transformedData):
         
         cursor = connection.cursor()
 
-        upsertQuery = f"""
+        query = f"""
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
         ON CONFLICT (period) DO NOTHING;
         """
 
         values = [tuple(row) for row in transformedData[columnNames].values]
-        execute_values(cursor, upsertQuery, values)
+        execute_values(cursor, query, values)
         connection.commit()
 
     except Exception as e:
