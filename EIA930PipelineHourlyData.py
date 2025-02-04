@@ -219,20 +219,17 @@ def transformTask(**kwargs):
 
     balancingAuthorities, energySources = renameColumnsToSnakeCase(  
         hourlyEIA930FormDataReferenceTables['balancingAuthorities'],  
-        hourlyEIA930FormDataReferenceTables['energySources']  
-    )  
+        hourlyEIA930FormDataReferenceTables['energySources'])  
 
     cleanedHourlyNetGenerationData, cleanedHourlyDemandInterchangeAndGenerationData, cleanedHourlyInterchangeByNeighboringBA = renameColumnsToSnakeCase(  
         cleanedHourlyNetGenerationData,  
         cleanedHourlyDemandInterchangeAndGenerationData,  
-        cleanedHourlyInterchangeByNeighboringBA  
-    )  
+        cleanedHourlyInterchangeByNeighboringBA)  
 
     transformedHourlyNetGenerationByEnergySource, transformedHourlyRespondentsProducingAndGenerating, transformedHourlyStatsByResponseType = renameColumnsToSnakeCase(  
         transformedHourlyNetGenerationByEnergySource,  
         transformedHourlyRespondentsProducingAndGenerating,  
-        transformedHourlyStatsByResponseType  
-    )  
+        transformedHourlyStatsByResponseType)  
 
     taskInstance.xcom_push(key='balancingAuthorities', value=balancingAuthorities)  
     taskInstance.xcom_push(key='energySources', value=energySources)  
