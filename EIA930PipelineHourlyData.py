@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 from dotenv import load_dotenv
 import pickle
+import psycopg2
+from psycopg2.extras import execute_values
 load_dotenv()
 
 # TODO
-# Insert to PostgreSQL using ON CONFLICT DO NOTHING syntax, to avoid duplicate inserts.
 # Refactor extract, transform, and load blocks to be methods, which will be passed to the operators when defining the DAG. DAG runs once per day.
 
 def harvestEIA930FormDataReferenceTables():
@@ -140,6 +141,36 @@ def computeHourlyStatsByResponseType(cleanedData):
     return aggregatedResponseTypeData
 
 
+def loadToPostgreSQL(tableName, transformedData):
+    
+    columnNames = transformedData.columns.tolist()
+
+    try:
+        connection = psycopg2.connect(
+            dbname='energy_and_weather_data',
+            host='localhost',
+            port='5432')
+        
+        cursor = connection.cursor()
+
+        upsertQuery = f"""
+        INSERT INTO {tableName} ({', '.join(columnNames)})
+        VALUES %s
+        ON CONFLICT (period) DO NOTHING;
+        """
+
+        values = [tuple(row) for row in transformedData[columnNames].values]
+        execute_values(cursor, upsertQuery, values)
+        connection.commit()
+
+    except Exception as e:
+        raise Exception(f"Error occurred for table {tableName}, while loading {transformedData}, in loadToPostgreSQL: {e}")
+    
+    finally:
+        cursor.close()
+        connection.close()
+
+
 # extract
 hourlyEIA930FormDataReferenceTables = harvestEIA930FormDataReferenceTables()
 hourlyNetGenerationData = paginationCycler("fuel-type-data", "Unable to harvest data for 'Hourly Net Generation by Balancing Authority and Energy Source.'")
@@ -156,4 +187,5 @@ transformedHourlyRespondentsProducingAndGenerating = computeHourlyRespondentsPro
 transformedHourlyStatsByResponseType = computeHourlyStatsByResponseType(cleanedHourlyDemandInterchangeAndGenerationData)
 
 # load
+loadToPostgreSQL('EIA930_hourly_statistics_by_response_type', transformedHourlyStatsByResponseType)
 
