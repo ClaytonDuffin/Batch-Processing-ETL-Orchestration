@@ -3,7 +3,7 @@ import pandas as pd
 import json
 
 curatedCoordinates = pd.read_csv('Enter File Path Here.') # https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/blob/main/curatedCoordinates.csv
-geoJSONFilePath= 'Enter File Path Here.' # https://github.com/PublicaMundi/MappingAPI/blob/master/data/geojson/us-states.json
+geoJSONFilePath = 'Enter File Path Here.' # https://github.com/PublicaMundi/MappingAPI/blob/master/data/geojson/us-states.json
 
 with open(geoJSONFilePath) as f:
     geoJSONData = json.load(f)
