@@ -1,8 +1,8 @@
+from datetime import datetime, timedelta
+import numpy as np
 import openmeteo_requests
 import requests_cache
 from retry_requests import retry
-from datetime import datetime, timedelta
-import numpy as np
 
 # TODO
 # Add remaining 26 weather variables to parameters.
