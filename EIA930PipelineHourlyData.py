@@ -79,10 +79,10 @@ def paginationCycler(endpoint, errorMessage):
             dataJSON = harvestEIA930FormData(endpoint, errorMessage, offset)
             allCalls.append(dataJSON)
             
-            if dataJSON['response']['data'][-1]['period'] > yesterday:
+            if len(dataJSON['response']['data']) == 0:
                 break
             
-            if len(dataJSON['response']['data']) == 0:
+            if dataJSON['response']['data'][-1]['period'] > yesterday:
                 break
         
             offset += 5000
@@ -99,7 +99,10 @@ def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
     
     combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True))
     combinedData['period'] = pd.to_datetime(combinedData['period'], errors='coerce')
-    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == yesterday].index[0] + 1][:-1]
+    try:
+        dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == yesterday].index[0] + 1][:-1]
+    except IndexError:
+        dataSubset = combinedData
     
     filteredData = (dataSubset
                     .pipe(lambda df: df[df['respondent' if 'respondent' in df.columns else 'fromba']
