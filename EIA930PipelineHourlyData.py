@@ -45,12 +45,12 @@ def harvestEIA930FormDataReferenceTables():
 def harvestEIA930FormData(endpoint, errorMessage, offset):
         
     url = f"https://api.eia.gov/v2/electricity/rto/{endpoint}/data/"
-    twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
+    threeDaysAgo = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%dT00')
     
     params = {
         'frequency': 'hourly',
         'data[0]': 'value',
-        'start': twoDaysAgo,
+        'start': threeDaysAgo,
         'sort[0][column]': 'period',
         'sort[0][direction]': 'asc',
         'offset': offset,
@@ -70,7 +70,7 @@ def harvestEIA930FormData(endpoint, errorMessage, offset):
 
 def paginationCycler(endpoint, errorMessage):
 
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT00')
+    twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
     allCalls = []
     offset = 0
     
@@ -82,7 +82,7 @@ def paginationCycler(endpoint, errorMessage):
             if len(dataJSON['response']['data']) == 0:
                 break
             
-            if dataJSON['response']['data'][-1]['period'] > yesterday:
+            if dataJSON['response']['data'][-1]['period'] > twoDaysAgo:
                 break
         
             offset += 5000
@@ -95,14 +95,11 @@ def paginationCycler(endpoint, errorMessage):
 
 def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
     
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT00')
+    twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
     
     combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True))
     combinedData['period'] = pd.to_datetime(combinedData['period'], errors='coerce')
-    try:
-        dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == yesterday].index[0] + 1][:-1]
-    except IndexError:
-        dataSubset = combinedData
+    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == twoDaysAgo].index[0] + 1][:-1]
     
     filteredData = (dataSubset
                     .pipe(lambda df: df[df['respondent' if 'respondent' in df.columns else 'fromba']
