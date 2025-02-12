@@ -99,7 +99,7 @@ def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
     
     combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True))
     combinedData['period'] = pd.to_datetime(combinedData['period'], errors='coerce')
-    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT00') == yesterday].index[0] + 1][:-1]
+    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == yesterday].index[0] + 1][:-1]
     
     filteredData = (dataSubset
                     .pipe(lambda df: df[df['respondent' if 'respondent' in df.columns else 'fromba']
