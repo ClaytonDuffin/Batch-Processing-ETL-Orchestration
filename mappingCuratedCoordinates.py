@@ -2,8 +2,8 @@ import folium
 import pandas as pd
 import json
 
-curatedCoordinates = pd.read_csv('Enter File Path Here.') # https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/blob/main/curatedCoordinates.csv
-geoJSONFilePath = 'Enter File Path Here.' # https://github.com/PublicaMundi/MappingAPI/blob/master/data/geojson/us-states.json
+curatedCoordinates = pd.read_csv('Enter File Path Here.') # Download @ https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/blob/main/curatedCoordinates.csv
+geoJSONFilePath = 'Enter File Path Here.' # Download @ https://github.com/PublicaMundi/MappingAPI/blob/master/data/geojson/us-states.json
 
 with open(geoJSONFilePath) as f:
     geoJSONData = json.load(f)
@@ -19,8 +19,8 @@ folium.GeoJson(
         'fillOpacity': 0.1
     }).add_to(USMap)
 
-for _, row in curatedCoordinates.iterrows():
-    latitude, longitude = row['Latitude'], row['Longitude']
+for _, location in curatedCoordinates.iterrows():
+    latitude, longitude = location['Latitude'], location['Longitude']
     onCoordinateClick = folium.Popup(f"<span style='color:black;'>Latitude: {latitude}<br>Longitude: {longitude}</span>", max_width=300)
 
     folium.CircleMarker(
