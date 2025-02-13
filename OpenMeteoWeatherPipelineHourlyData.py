@@ -52,6 +52,7 @@ def cleaner(weatherAtCoordinates):
     
     numberOfWeatherVariables = 4
     weatherData = []
+    
     for location in weatherAtCoordinates:
         
         weatherAtLocation  = pd.DataFrame({"date": pd.date_range(start=pd.to_datetime(location.Hourly().Time(), unit="s", utc=True),
