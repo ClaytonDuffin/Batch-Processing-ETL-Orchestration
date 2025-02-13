@@ -6,7 +6,7 @@ from retry_requests import retry
 
 # TODO
 # Add remaining 26 weather variables to parameters.
-# Identify and implement transformations.
+# Finish implementing transformations.
 # Initialize PostgreSQL tables. Insert to tables.
 # Define DAG and components following the same flow as the first pipeline.
 
@@ -37,7 +37,7 @@ def harvestWeatherData(latitude, longitude, startDate, endDate):
 
 def coordinateCycler():
     
-    curatedCoordinates = pd.read_csv("https://raw.githubusercontent.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/main/curatedCoordinates.csv")[0:3]
+    curatedCoordinates = pd.read_csv("https://raw.githubusercontent.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/main/curatedCoordinates.csv")[0:6]
     sevenDaysAgo = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
     responses = []
     
@@ -72,8 +72,35 @@ def cleaner(weatherAtCoordinates):
     return stackedSortedWeatherData
     
 
+def computeMeansPerStatePerHour(cleanedWeatherAtCoordinates):
+            
+    lastNLocations = []
+    meanSubframes = []
+    stateMeansPerHour = []
+    numberOfLocationsPerState = 3
+    numberOfStates = 2
+    
+    for _, location in cleanedWeatherAtCoordinates.iterrows():
+        
+        lastNLocations.append(location[3:])
+        
+        if len(lastNLocations) == numberOfLocationsPerState:
+            
+            meanValues = pd.DataFrame(lastNLocations).mean()
+            meanSubframes.append(meanValues)
+            
+            lastNLocations = []
+            
+            if len(meanSubframes) == (numberOfStates * 24):
+                for state in range(numberOfStates): 
+                    stateMeansPerHour.append(pd.concat(meanSubframes[state::numberOfStates], axis=1).T)
+    
+    return stateMeansPerHour
+
+
 #extract
 weatherAtCoordinates = coordinateCycler()
 
 #transform 
 cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)
+transformedStateMeansPerHour = computeMeansPerStatePerHour(cleanedWeatherAtCoordinates)
