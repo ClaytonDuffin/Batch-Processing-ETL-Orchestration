@@ -6,7 +6,6 @@ from retry_requests import retry
 
 # TODO
 # Add remaining 26 weather variables to parameters.
-# Finish cleaning, restructuring, and sorting responses.
 # Identify and implement transformations.
 # Initialize PostgreSQL tables. Insert to tables.
 # Define DAG and components following the same flow as the first pipeline.
@@ -40,11 +39,10 @@ def coordinateCycler():
     
     curatedCoordinates = pd.read_csv("https://raw.githubusercontent.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/main/curatedCoordinates.csv")[0:3]
     sevenDaysAgo = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
-    sixDaysAgo = (datetime.utcnow() - timedelta(days=6)).strftime("%Y-%m-%d")
-
     responses = []
+    
     for _, location in curatedCoordinates.iterrows():
-        response = harvestWeatherData(location['Latitude'], location['Longitude'], sevenDaysAgo, sixDaysAgo)
+        response = harvestWeatherData(location['Latitude'], location['Longitude'], sevenDaysAgo, sevenDaysAgo)
         responses.extend(response)
     
     return responses
@@ -67,10 +65,12 @@ def cleaner(weatherAtCoordinates):
             weatherAtLocation[variable] = location.Hourly().Variables(variable).ValuesAsNumpy()
         
         weatherData.append(weatherAtLocation)
-    
-    return weatherData
 
+    stackedSortedWeatherData = pd.concat(weatherData, ignore_index=True).sort_values(by='date', kind='mergesort').reset_index(drop=True)
+
+    return stackedSortedWeatherData
     
+
 #extract
 weatherAtCoordinates = coordinateCycler()
 
