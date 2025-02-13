@@ -73,28 +73,17 @@ def cleaner(weatherAtCoordinates):
     
 
 def computeMeansPerStatePerHour(cleanedWeatherAtCoordinates):
-            
-    lastNLocations = []
-    meanSubframes = []
-    stateMeansPerHour = []
+        
     numberOfLocationsPerState = 3
     numberOfStates = 2
-    
-    for _, location in cleanedWeatherAtCoordinates.iterrows():
+
+    stateMeansPerHour = (cleanedWeatherAtCoordinates
+                         .iloc[:, 3:]
+                         .groupby(cleanedWeatherAtCoordinates.index // numberOfLocationsPerState)
+                         .mean()
+                         .reset_index(drop=True)
+                         .pipe(lambda df: [df.iloc[i::numberOfStates].reset_index(drop=True) for i in range(numberOfStates)]))
         
-        lastNLocations.append(location[3:])
-        
-        if len(lastNLocations) == numberOfLocationsPerState:
-            
-            meanValues = pd.DataFrame(lastNLocations).mean()
-            meanSubframes.append(meanValues)
-            
-            lastNLocations = []
-            
-            if len(meanSubframes) == (numberOfStates * 24):
-                for state in range(numberOfStates): 
-                    stateMeansPerHour.append(pd.concat(meanSubframes[state::numberOfStates], axis=1).T)
-    
     return stateMeansPerHour
 
 
