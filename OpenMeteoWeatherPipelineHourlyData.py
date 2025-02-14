@@ -82,7 +82,7 @@ def computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, computationType):
               'South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming']
     
     numberOfLocationsPerState = 3
-    numberOfStates = 2
+    numberOfStates = int(len(cleanedWeatherAtCoordinates)/24/numberOfLocationsPerState)
 
     labeledStateMetricsPerHour = (cleanedWeatherAtCoordinates
                                   .iloc[:, 3:]
