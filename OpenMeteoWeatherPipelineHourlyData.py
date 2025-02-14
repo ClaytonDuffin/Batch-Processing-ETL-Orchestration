@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 import openmeteo_requests
 import requests_cache
 from retry_requests import retry
@@ -72,19 +73,28 @@ def cleaner(weatherAtCoordinates):
     return stackedSortedWeatherData
     
 
-def computeMeansPerStatePerHour(cleanedWeatherAtCoordinates):
+def computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, computationType):
         
+    states = ['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia',
+              'Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland',
+              'Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey',
+              'New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina',
+              'South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming']
+    
     numberOfLocationsPerState = 3
     numberOfStates = 2
 
-    stateMeansPerHour = (cleanedWeatherAtCoordinates
-                         .iloc[:, 3:]
-                         .groupby(cleanedWeatherAtCoordinates.index // numberOfLocationsPerState)
-                         .mean()
-                         .reset_index(drop=True)
-                         .pipe(lambda df: [df.iloc[i::numberOfStates].reset_index(drop=True) for i in range(numberOfStates)]))
-        
-    return stateMeansPerHour
+    labeledStateMetricsPerHour = (cleanedWeatherAtCoordinates
+                                  .iloc[:, 3:]
+                                  .groupby(cleanedWeatherAtCoordinates.index // numberOfLocationsPerState)
+                                  .apply(getattr(pd.Series, computationType))
+                                  .reset_index(drop=True)
+                                  .pipe(lambda df: pd.concat((df.iloc[i::numberOfStates].reset_index(drop=True).assign(state=states[i]) for i in range(numberOfStates)), ignore_index=True))
+                                  .assign(date=lambda df: np.tile(cleanedWeatherAtCoordinates['date'].unique(), len(df) // len(cleanedWeatherAtCoordinates['date'].unique()))[:len(df)])
+                                  .reindex(columns=['date', 'state'] + [col for col in cleanedWeatherAtCoordinates.columns if col not in ['date', 'state']])
+                                  ).drop(columns=['latitude', 'longitude'], errors='ignore')
+    
+    return labeledStateMetricsPerHour
 
 
 #extract
@@ -92,4 +102,9 @@ weatherAtCoordinates = coordinateCycler()
 
 #transform 
 cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)
-transformedStateMeansPerHour = computeMeansPerStatePerHour(cleanedWeatherAtCoordinates)
+
+transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
+transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
+transformedStateSumsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'sum')
+
+#load
