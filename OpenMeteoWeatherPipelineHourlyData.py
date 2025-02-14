@@ -92,7 +92,7 @@ def computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, computationType):
                                   .pipe(lambda df: pd.concat((df.iloc[i::numberOfStates].reset_index(drop=True).assign(state=states[i]) for i in range(numberOfStates)), ignore_index=True))
                                   .assign(date=lambda df: np.tile(cleanedWeatherAtCoordinates['date'].unique(), len(df) // len(cleanedWeatherAtCoordinates['date'].unique()))[:len(df)])
                                   .reindex(columns=['date', 'state'] + [col for col in cleanedWeatherAtCoordinates.columns if col not in ['date', 'state']])
-                                  ).drop(columns=['latitude', 'longitude'], errors='ignore')
+                                  ).drop(columns=['latitude', 'longitude'], errors='ignore').sort_values(by='date', kind='mergesort').reset_index(drop=True)
     
     return labeledStateMetricsPerHour
 
@@ -105,6 +105,5 @@ cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)
 
 transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
 transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
-transformedStateSumsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'sum')
 
 #load
