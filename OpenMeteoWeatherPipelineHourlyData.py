@@ -111,11 +111,7 @@ def loadToPostgreSQL(tableName, transformedData):
     columnNames = transformedData.columns.tolist()
 
     try:
-        connection = psycopg2.connect(
-            dbname='energy_and_weather_data',
-            host='localhost',
-            port='5432'
-        )
+        connection = psycopg2.connect(dbname='energy_and_weather_data', host='localhost', port='5432')
         cursor = connection.cursor()
 
         query = f"""
