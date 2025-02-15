@@ -6,13 +6,18 @@ import requests_cache
 from retry_requests import retry
 import psycopg2
 from psycopg2.extras import execute_values
+from airflow import DAG
+from airflow.operators.python import PythonOperator
 
-# TODO
-# Add remaining 26 weather variables to parameters.
-# Define DAG and components following the same flow as the first pipeline.
 
 def weatherVariables():
-    return ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature"]
+    
+    return ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature", "precipitation",
+            "rain", "snowfall", "snow_depth", "weather_code", "pressure_msl",
+            "surface_pressure", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
+            "et0_fao_evapotranspiration", "vapour_pressure_deficit", "wind_speed_10m", "wind_speed_100m", "wind_direction_10m",
+            "wind_direction_100m", "wind_gusts_10m", "soil_temperature_0_to_7cm", "soil_temperature_7_to_28cm", "soil_temperature_28_to_100cm",
+            "soil_temperature_100_to_255cm", "soil_moisture_0_to_7cm", "soil_moisture_7_to_28cm", "soil_moisture_28_to_100cm", "soil_moisture_100_to_255cm"]
 
 
 def harvestWeatherData(latitude, longitude, startDate, endDate):
@@ -40,7 +45,7 @@ def harvestWeatherData(latitude, longitude, startDate, endDate):
 
 def coordinateCycler():
     
-    curatedCoordinates = pd.read_csv("https://raw.githubusercontent.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/main/curatedCoordinates.csv")[0:6]
+    curatedCoordinates = pd.read_csv("https://raw.githubusercontent.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/main/curatedCoordinates.csv")
     sevenDaysAgo = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
     responses = []
     
@@ -72,6 +77,7 @@ def cleaner(weatherAtCoordinates):
 
     stackedSortedWeatherData = pd.concat(weatherData, ignore_index=True).sort_values(by='date', kind='mergesort').reset_index(drop=True)
     stackedSortedWeatherData.columns = ['date','latitude','longitude'] + weatherVariables()
+    stackedSortedWeatherData['date'] = pd.to_datetime(stackedSortedWeatherData['date'], format='%Y-%m-%dT%H')
 
     return stackedSortedWeatherData
     
@@ -101,21 +107,20 @@ def computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, computationType):
 
 
 def loadToPostgreSQL(tableName, transformedData):
-    
+
     columnNames = transformedData.columns.tolist()
 
     try:
         connection = psycopg2.connect(
             dbname='energy_and_weather_data',
             host='localhost',
-            port='5432')
-        
+            port='5432'
+        )
         cursor = connection.cursor()
 
         query = f"""
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
-        ON CONFLICT (date) DO NOTHING;
         """
 
         values = [tuple(row) for row in transformedData[columnNames].values]
@@ -123,22 +128,82 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.commit()
 
     except Exception as e:
-        raise Exception(f"Error occurred for table {tableName}, while loading {len(transformedData)} rows, in loadToPostgreSQL: {e}")
-    
+        raise Exception(f"Error occurred for table {tableName} while loading {transformedData}: {e}")
+
     finally:
         cursor.close()
         connection.close()
 
 
-#extract
-weatherAtCoordinates = coordinateCycler()
+def extractTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+    
+    weatherAtCoordinates = coordinateCycler()  
+    
+    taskInstance.xcom_push(key='weatherAtCoordinates', value=weatherAtCoordinates)  
+    
 
-#transform 
-cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)
-transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
-transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
+def transformTask(**kwargs):  
 
-#load
-loadToPostgreSQL('openmeteo_cleaned_weather', cleanedWeatherAtCoordinates)  
-loadToPostgreSQL('openmeteo_weather_means_per_hour', transformedStateMeansPerHour)  
-loadToPostgreSQL('openmeteo_weather_deviations_per_hour', transformedStateStandardDeviationsPerHour)
+    taskInstance = kwargs['ti']  
+
+    weatherAtCoordinates = taskInstance.xcom_pull(task_ids='extractTask', key='weatherAtCoordinates')
+
+    cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)  
+    
+    transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
+    transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
+
+    taskInstance.xcom_push(key='cleanedWeatherAtCoordinates', value=cleanedWeatherAtCoordinates)  
+    taskInstance.xcom_push(key='transformedStateMeansPerHour', value=transformedStateMeansPerHour)  
+    taskInstance.xcom_push(key='transformedStateStandardDeviationsPerHour', value=transformedStateStandardDeviationsPerHour)  
+
+
+def loadTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+
+    cleanedWeatherAtCoordinates = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedWeatherAtCoordinates')  
+    transformedStateMeansPerHour = taskInstance.xcom_pull(task_ids='transformTask', key='transformedStateMeansPerHour')  
+    transformedStateStandardDeviationsPerHour = taskInstance.xcom_pull(task_ids='transformTask', key='transformedStateStandardDeviationsPerHour')  
+   
+    loadToPostgreSQL('openmeteo_cleaned_weather', cleanedWeatherAtCoordinates)  
+    loadToPostgreSQL('openmeteo_weather_means_per_hour', transformedStateMeansPerHour)  
+    loadToPostgreSQL('openmeteo_weather_deviations_per_hour', transformedStateStandardDeviationsPerHour)
+
+
+dagOpenMeteoHourlyData = DAG(
+    'OpenMeteoWeatherPipelineHourlyData',
+    default_args={
+        'owner': 'airflow',
+        'start_date': datetime(2025, 1, 31),
+        'retries': 2,
+        'retry_delay': timedelta(minutes=15)},
+    description='DAG to extract, transform, and load weather data. Scheduled to run once per day.',
+    schedule_interval=timedelta(days=1),
+    catchup=False)
+
+
+extract = PythonOperator(
+    task_id='OpenMeteoExtract',
+    python_callable=extractTask,
+    provide_context=True,
+    dag=dagOpenMeteoHourlyData)
+
+
+transform = PythonOperator(
+    task_id='OpenMeteoTransform',
+    python_callable=transformTask,
+    provide_context=True,
+    dag=dagOpenMeteoHourlyData)
+
+
+load = PythonOperator(
+    task_id='OpenMeteoLoad',
+    python_callable=loadTask,
+    provide_context=True,
+    dag=dagOpenMeteoHourlyData)
+
+
+extract >> transform >> load
