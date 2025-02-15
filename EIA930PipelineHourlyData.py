@@ -97,9 +97,9 @@ def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
     
     twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
     
-    combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True))
-    combinedData['period'] = pd.to_datetime(combinedData['period'], errors='coerce')
-    dataSubset = combinedData.iloc[:combinedData[combinedData['period'].dt.strftime('%Y-%m-%dT%H') == twoDaysAgo].index[0] + 1][:-1]
+    combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in hourlyData], ignore_index=True)).rename(columns={'period': 'date'})
+    combinedData['date'] = pd.to_datetime(combinedData['date'], errors='coerce')
+    dataSubset = combinedData.iloc[:combinedData[combinedData['date'].dt.strftime('%Y-%m-%dT%H') == twoDaysAgo].index[0] + 1][:-1]
     
     filteredData = (dataSubset
                     .pipe(lambda df: df[df['respondent' if 'respondent' in df.columns else 'fromba']
@@ -112,8 +112,8 @@ def computeHourlyNetGenerationByEnergySource(cleanedData):
     
     aggregatedEnergySourceData = (cleanedData
                                   .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
-                                  .pipe(lambda df: df.groupby(['period', 'fueltype'], as_index=False)['value'].sum())
-                                  .pipe(lambda df: df.sort_values(by=['period', 'fueltype'])))
+                                  .pipe(lambda df: df.groupby(['date', 'fueltype'], as_index=False)['value'].sum())
+                                  .pipe(lambda df: df.sort_values(by=['date', 'fueltype'])))
     
     return aggregatedEnergySourceData
 
@@ -122,11 +122,11 @@ def computeHourlyRespondentsProducingAndGenerating(cleanedData):
     
     hourlyRespondentsProducingAndGenerating = (cleanedData
                                                .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
-                                               .pipe(lambda df: df.groupby(['period', 'respondent', 'respondent-name', 'type'], as_index=False)['value'].sum())
-                                               .pipe(lambda df: df.pivot_table(index=['period', 'respondent', 'respondent-name'], columns='type', values='value', aggfunc='sum'))
+                                               .pipe(lambda df: df.groupby(['date', 'respondent', 'respondent-name', 'type'], as_index=False)['value'].sum())
+                                               .pipe(lambda df: df.pivot_table(index=['date', 'respondent', 'respondent-name'], columns='type', values='value', aggfunc='sum'))
                                                .pipe(lambda df: df.dropna())
                                                .pipe(lambda df: df.reset_index())
-                                               .pipe(lambda df: df.sort_values(by=['period', 'respondent'])))
+                                               .pipe(lambda df: df.sort_values(by=['date', 'respondent'])))
     
     return hourlyRespondentsProducingAndGenerating
 
@@ -135,8 +135,8 @@ def computeHourlyStatsByResponseType(cleanedData):
     
     aggregatedResponseTypeData = (cleanedData
                                   .pipe(lambda df: df.assign(value=pd.to_numeric(df['value'], errors='coerce')))
-                                  .pipe(lambda df: df.groupby(['period', 'type'], as_index=False)['value'].sum())
-                                  .pipe(lambda df: df.pivot_table(index='period', columns='type', values='value', aggfunc='sum'))
+                                  .pipe(lambda df: df.groupby(['date', 'type'], as_index=False)['value'].sum())
+                                  .pipe(lambda df: df.pivot_table(index='date', columns='type', values='value', aggfunc='sum'))
                                   .pipe(lambda df: df.reset_index()))
 
     return aggregatedResponseTypeData
@@ -170,7 +170,7 @@ def loadToPostgreSQL(tableName, transformedData):
         query = f"""
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
-        ON CONFLICT (period) DO NOTHING;
+        ON CONFLICT (date) DO NOTHING;
         """
 
         values = [tuple(row) for row in transformedData[columnNames].values]
@@ -178,7 +178,7 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.commit()
 
     except Exception as e:
-        raise Exception(f"Error occurred for table {tableName}, while loading {len(transformedData)} rows, in loadToPostgreSQL: {e}")
+        raise Exception(f"Error occurred for table {tableName}, while loading {transformedData}, in loadToPostgreSQL: {e}")
     
     finally:
         cursor.close()
