@@ -115,7 +115,6 @@ def removeAllTablesfromDatabase(databaseName):
             print(f"Error removing table {table_name}: {e}")
     
     connection.commit()
-    
     cursor.close()
     connection.close()
 
