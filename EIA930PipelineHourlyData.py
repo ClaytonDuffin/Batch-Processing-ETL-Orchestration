@@ -156,30 +156,34 @@ def renameColumnsToSnakeCase(*transformedDataFrames):
 
 
 def loadToPostgreSQL(tableName, transformedData):
-    
+
     columnNames = transformedData.columns.tolist()
+    conflictKeys = ['date', 'ba_code', 'energy_source_code']
+    conflictKey = next((key for key in conflictKeys if key in columnNames), None)
 
     try:
         connection = psycopg2.connect(
             dbname='energy_and_weather_data',
             host='localhost',
-            port='5432')
-        
+            port='5432'
+        )
         cursor = connection.cursor()
 
         query = f"""
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
-        ON CONFLICT (date) DO NOTHING;
         """
+
+        if conflictKey:
+            query += f" ON CONFLICT ({conflictKey}) DO NOTHING;"
 
         values = [tuple(row) for row in transformedData[columnNames].values]
         execute_values(cursor, query, values)
         connection.commit()
 
     except Exception as e:
-        raise Exception(f"Error occurred for table {tableName}, while loading {transformedData}, in loadToPostgreSQL: {e}")
-    
+        raise Exception(f"Error occurred for table {tableName} while loading {transformedData}: {e}")
+
     finally:
         cursor.close()
         connection.close()
