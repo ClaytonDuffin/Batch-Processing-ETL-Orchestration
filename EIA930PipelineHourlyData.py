@@ -178,7 +178,7 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.commit()
 
     except Exception as e:
-        raise Exception(f"Error occurred for table {tableName}, while loading {transformedData}, in loadToPostgreSQL: {e}")
+        raise Exception(f"Error occurred for table {tableName}, while loading {len(transformedData)} rows, in loadToPostgreSQL: {e}")
     
     finally:
         cursor.close()
