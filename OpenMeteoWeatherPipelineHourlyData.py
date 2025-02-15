@@ -4,12 +4,16 @@ import numpy as np
 import openmeteo_requests
 import requests_cache
 from retry_requests import retry
+import psycopg2
+from psycopg2.extras import execute_values
 
 # TODO
 # Add remaining 26 weather variables to parameters.
-# Finish implementing transformations.
-# Initialize PostgreSQL tables. Insert to tables.
 # Define DAG and components following the same flow as the first pipeline.
+
+def weatherVariables():
+    return ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature"]
+
 
 def harvestWeatherData(latitude, longitude, startDate, endDate):
     
@@ -20,15 +24,13 @@ def harvestWeatherData(latitude, longitude, startDate, endDate):
 
     openMeteo = harvestWeatherData.openMeteoClient
     url = "https://archive-api.open-meteo.com/v1/archive"
-    
-    weatherVariables = ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature"]
-    
+        
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "start_date": startDate,
         "end_date": endDate,
-        "hourly": weatherVariables
+        "hourly": weatherVariables()
     }
     
     response = openMeteo.weather_api(url, params=params)
@@ -51,8 +53,8 @@ def coordinateCycler():
 
 def cleaner(weatherAtCoordinates):
     
-    numberOfWeatherVariables = 4
     weatherData = []
+    numberOfWeatherVariables = len(weatherVariables())
     
     for location in weatherAtCoordinates:
         
@@ -69,6 +71,7 @@ def cleaner(weatherAtCoordinates):
         weatherData.append(weatherAtLocation)
 
     stackedSortedWeatherData = pd.concat(weatherData, ignore_index=True).sort_values(by='date', kind='mergesort').reset_index(drop=True)
+    stackedSortedWeatherData.columns = ['date','latitude','longitude'] + weatherVariables()
 
     return stackedSortedWeatherData
     
@@ -97,13 +100,45 @@ def computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, computationType):
     return labeledStateMetricsPerHour
 
 
+def loadToPostgreSQL(tableName, transformedData):
+    
+    columnNames = transformedData.columns.tolist()
+
+    try:
+        connection = psycopg2.connect(
+            dbname='energy_and_weather_data',
+            host='localhost',
+            port='5432')
+        
+        cursor = connection.cursor()
+
+        query = f"""
+        INSERT INTO {tableName} ({', '.join(columnNames)})
+        VALUES %s
+        ON CONFLICT (period) DO NOTHING;
+        """
+
+        values = [tuple(row) for row in transformedData[columnNames].values]
+        execute_values(cursor, query, values)
+        connection.commit()
+
+    except Exception as e:
+        raise Exception(f"Error occurred for table {tableName}, while loading {len(transformedData)} rows, in loadToPostgreSQL: {e}")
+    
+    finally:
+        cursor.close()
+        connection.close()
+
+
 #extract
 weatherAtCoordinates = coordinateCycler()
 
 #transform 
 cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)
-
 transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
 transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
 
 #load
+loadToPostgreSQL('openmeteo_cleaned_weather', cleanedWeatherAtCoordinates)  
+loadToPostgreSQL('openmeteo_weather_means_per_hour', transformedStateMeansPerHour)  
+loadToPostgreSQL('openmeteo_weather_deviations_per_hour', transformedStateStandardDeviationsPerHour)
