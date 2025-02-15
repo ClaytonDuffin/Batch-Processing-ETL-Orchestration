@@ -107,12 +107,12 @@ def removeAllTablesfromDatabase(databaseName):
     tables = cursor.fetchall()
     
     for table in tables:
-        table_name = table[0]
+        tableName = table[0]
         try:
-            cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
-            print(f"Table {table_name} has been removed.")
+            cursor.execute(f"DROP TABLE IF EXISTS {tableName};")
+            print(f"Table {tableName} has been removed.")
         except Exception as e:
-            print(f"Error removing table {table_name}: {e}")
+            print(f"Error removing table {tableName}: {e}")
     
     connection.commit()
     cursor.close()
