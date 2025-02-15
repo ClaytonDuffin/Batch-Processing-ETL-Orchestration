@@ -115,7 +115,7 @@ def loadToPostgreSQL(tableName, transformedData):
         query = f"""
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
-        ON CONFLICT (period) DO NOTHING;
+        ON CONFLICT (date) DO NOTHING;
         """
 
         values = [tuple(row) for row in transformedData[columnNames].values]
