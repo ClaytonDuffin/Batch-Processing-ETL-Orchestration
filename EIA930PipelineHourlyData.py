@@ -158,8 +158,6 @@ def renameColumnsToSnakeCase(*transformedDataFrames):
 def loadToPostgreSQL(tableName, transformedData):
 
     columnNames = transformedData.columns.tolist()
-    conflictKeys = ['date', 'ba_code', 'energy_source_code']
-    conflictKey = next((key for key in conflictKeys if key in columnNames), None)
 
     try:
         connection = psycopg2.connect(
@@ -173,9 +171,6 @@ def loadToPostgreSQL(tableName, transformedData):
         INSERT INTO {tableName} ({', '.join(columnNames)})
         VALUES %s
         """
-
-        if conflictKey:
-            query += f" ON CONFLICT ({conflictKey}) DO NOTHING;"
 
         values = [tuple(row) for row in transformedData[columnNames].values]
         execute_values(cursor, query, values)
