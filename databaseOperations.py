@@ -20,7 +20,7 @@ def createDatabase(databaseName):
 
 def createTable(databaseName, tableName, tableColumnNames):
     
-    connection = psycopg2.connect(dbname=databaseName)
+    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
     cursor = connection.cursor()
     
     columnNames = ", ".join([f"{col} {dtype}" for col, dtype in tableColumnNames.items()])
@@ -40,11 +40,7 @@ def createTable(databaseName, tableName, tableColumnNames):
 
 def displayTableContents(databaseName, tableName, numberOfRowsToDisplay=5):
     
-    connection = psycopg2.connect(
-        dbname=databaseName,
-        host='localhost',
-        port='5432',
-    )
+    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
     cursor = connection.cursor()
 
     query = f"""
@@ -64,11 +60,7 @@ def displayTableContents(databaseName, tableName, numberOfRowsToDisplay=5):
 
 def deleteTableContents(databaseName, tableName):
     
-    connection = psycopg2.connect(
-        dbname=databaseName,
-        host='localhost',
-        port='5432',
-    )
+    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
     cursor = connection.cursor()
 
     query = f"DELETE FROM {tableName}"
@@ -84,11 +76,7 @@ def deleteTableContents(databaseName, tableName):
 
 def displayAllTableNames(databaseName):
     
-    connection = psycopg2.connect(
-        dbname=databaseName,
-        host='localhost',
-        port='5432',
-    )
+    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
     cursor = connection.cursor()
     
     cursor.execute("""
@@ -107,11 +95,7 @@ def displayAllTableNames(databaseName):
         
 def removeAllTablesfromDatabase(databaseName):
     
-    connection = psycopg2.connect(
-        dbname=databaseName,
-        host='localhost',
-        port='5432',
-    )
+    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
     cursor = connection.cursor()
     
     cursor.execute("""
