@@ -145,7 +145,7 @@ def computeHourlyStatsByResponseType(cleanedData):
 def renameColumnsToSnakeCase(*transformedDataFrames):
     
     def toSnakeCase(colName):
-        colName = re.sub(r'[-\s]+', '_', colName)
+        colName = re.sub(r'[-\s/]+', '_', colName)
         colName = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', colName)
         return colName.lower()
 
