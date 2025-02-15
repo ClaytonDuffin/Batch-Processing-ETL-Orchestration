@@ -18,7 +18,7 @@ Due to the nature of the data sources, pipelines will need to extract data at va
 
 ## Curation Process for Coordinates <a name = "curpro"></a>
 
-For saving storage, while still preserving data quality, I chose to hand-curate coordinates for the weather pipeline. I recognize that this approach has its limitations; nonetheless, I feel it is a practical method for approximation, given the project’s current constraints. The weather pipeline currently extracts 108,000 datapoints daily.
+For saving storage, while still preserving data quality, I chose to hand-curate coordinates for the weather pipeline. I recognize that this approach has its limitations; nonetheless, I feel it is a practical method for approximation, given the project’s current constraints. As is, the weather pipeline extracts 108,000 datapoints daily.
 
 In choosing coordinates, I referred to power plant and substation locations, as well as satellite, powerline, population, climate, precipitation, and temperature maps. I aimed to capture as representative a sample as possible for each state, by selecting three coordinates which I thought might best represent each state’s topography, climate, and infrastructure. I made an effort to capture coordinates both in rural, and densely populated areas. Nationwide, all of the curated coordinates fall directly on top of powerlines. I chose a fairly balanced blend between major and minor voltage lines, to more accurately represent the grid, and to assist with examining transmission and distribution losses. To explore the interactive map of curated coordinates on your own, [click here](https://rawcdn.githack.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/a25225658ecbb9f0b749a2daf3422f3fb0ae3242/interactiveMapCuratedCoordinates.html).
 
