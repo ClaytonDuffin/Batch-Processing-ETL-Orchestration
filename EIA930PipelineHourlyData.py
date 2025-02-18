@@ -93,7 +93,7 @@ def paginationCycler(endpoint, errorMessage):
     return allCalls
 
 
-def cleanHourlyData(hourlyData, hourlyEIA930FormDataReferenceTables):
+def cleaner(hourlyData, hourlyEIA930FormDataReferenceTables):
     
     twoDaysAgo = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT00')
     
@@ -204,9 +204,9 @@ def transformTask(**kwargs):
     hourlyDemandInterchangeAndGenerationData = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyDemandInterchangeAndGenerationData')  
     hourlyInterchangeByNeighboringBA = taskInstance.xcom_pull(task_ids='extractTask', key='hourlyInterchangeByNeighboringBA')  
 
-    cleanedHourlyNetGenerationData = cleanHourlyData(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)  
-    cleanedHourlyDemandInterchangeAndGenerationData = cleanHourlyData(hourlyDemandInterchangeAndGenerationData, hourlyEIA930FormDataReferenceTables)  
-    cleanedHourlyInterchangeByNeighboringBA = cleanHourlyData(hourlyInterchangeByNeighboringBA, hourlyEIA930FormDataReferenceTables)  
+    cleanedHourlyNetGenerationData = cleaner(hourlyNetGenerationData, hourlyEIA930FormDataReferenceTables)  
+    cleanedHourlyDemandInterchangeAndGenerationData = cleaner(hourlyDemandInterchangeAndGenerationData, hourlyEIA930FormDataReferenceTables)  
+    cleanedHourlyInterchangeByNeighboringBA = cleaner(hourlyInterchangeByNeighboringBA, hourlyEIA930FormDataReferenceTables)  
 
     transformedHourlyNetGenerationByEnergySource = computeHourlyNetGenerationByEnergySource(cleanedHourlyNetGenerationData)  
     transformedHourlyRespondentsProducingAndGenerating = computeHourlyRespondentsProducingAndGenerating(cleanedHourlyDemandInterchangeAndGenerationData)  
