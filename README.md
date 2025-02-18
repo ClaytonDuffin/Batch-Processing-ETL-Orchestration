@@ -11,7 +11,7 @@ This is an ongoing project that began in late January of 2025. The goal of this 
 
 ## Orchestration Requirement <a name = "orcreq"></a>
 
-Due to the nature of the data sources, pipelines will need to extract data at varying intervals. Some pipelines will extract data every six hours, while others will only extract data once per month. In order to orchestrate these tasks accordingly, multiple directed acyclic graphs (DAGs) are used, via Apache Airflow. One DAG for each pipeline. Separating the pipelines was done to keep the project more organized, as data is fetched from a number of sources at different intervals, and multiple datasets are generated from many of these sources. Data flows to PostgreSQL after extracting, cleaning, restructuring, and transforming it. The data can then be queried from PostgreSQL for visualization and analysis.
+Due to the nature of the data sources, the pipelines extract data at varying intervals. Some pipelines extract data daily, while others only extract data once per month. In order to orchestrate these tasks accordingly, multiple directed acyclic graphs (DAGs) are used, via Apache Airflow. One DAG for each pipeline. Data flows to PostgreSQL after extracting, cleaning, restructuring, and transforming it. The data can then be queried from PostgreSQL for visualization and analysis.
 
 ## Pipeline Architecture <a name = "piparc"></a>
 ![PipelineArchitecture](https://github.com/user-attachments/assets/c2f5e4c0-cd6e-44a9-92b2-d0dca3a756e4)
