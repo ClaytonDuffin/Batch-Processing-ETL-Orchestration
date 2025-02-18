@@ -3,7 +3,7 @@
 + [Orchestration Requirement](#orcreq)		
 + [Pipeline Architecture](#piparc)
 + [Curation Process for Coordinates](#curpro)
-    + [Interactive Map](https://rawcdn.githack.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/a25225658ecbb9f0b749a2daf3422f3fb0ae3242f/interactiveMapCuratedCoordinates.html)
+    + [Interactive Map](https://rawcdn.githack.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration/a25225658ecbb9f0b749a2daf3422f3fb0ae3242/interactiveMapCuratedCoordinates.html)
 + [Visualization Sample](#vissam)
 
 ## Project Overview <a name = "proove"></a>
