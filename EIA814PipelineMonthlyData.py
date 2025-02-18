@@ -1,16 +1,16 @@
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import requests
 import pandas as pd
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import execute_values
+from airflow import DAG
+from airflow.operators.python import PythonOperator
 load_dotenv()
 
-# TODO 
-# Define DAG and components following the same structure as the other pipelines. Extract data on the 15th of each month.
 
 def harvestEIA814FormData(offset):
     
@@ -104,11 +104,59 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.close()
 
 
-# extract 
-monthlyCrudeOilImports = paginationCycler()  
+def extractTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+    monthlyCrudeOilImports = paginationCycler()  
+    taskInstance.xcom_push(key='monthlyCrudeOilImports', value=monthlyCrudeOilImports)  
+    
+    
+def transformTask(**kwargs):  
 
-# transform
-cleanedMonthlyCrudeOilImports = cleaner(monthlyCrudeOilImports)
+    taskInstance = kwargs['ti']  
+    monthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='extractTask', key='monthlyCrudeOilImports')
+    cleanedMonthlyCrudeOilImports = renameColumnsToSnakeCase(cleaner(monthlyCrudeOilImports))
+    taskInstance.xcom_push(key='cleanedMonthlyCrudeOilImports', value=cleanedMonthlyCrudeOilImports)  
 
-# load
-loadToPostgreSQL('EIA814_cleaned_monthly_crude_oil_imports', renameColumnsToSnakeCase(cleanedMonthlyCrudeOilImports))
+
+def loadTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+    cleanedMonthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedMonthlyCrudeOilImports')  
+    loadToPostgreSQL('EIA814_cleaned_monthly_crude_oil_imports', cleanedMonthlyCrudeOilImports)
+
+
+dagEIA814MonthlyData = DAG(
+    'EIA814PipelineMonthlyData',
+    default_args={
+        'owner': 'airflow',
+        'start_date': datetime(2025, 1, 31),
+        'retries': 2,
+        'retry_delay': timedelta(minutes=15)},
+    description='DAG to extract, transform, and load EIA-814 form monthly data. Scheduled to run once per month, on the 15th, at midnight.',
+    schedule_interval='0 0 15 * *',
+    catchup=False)
+
+
+extract = PythonOperator(
+    task_id='EIA814Extract',
+    python_callable=extractTask,
+    provide_context=True,
+    dag=dagEIA814MonthlyData)
+
+
+transform = PythonOperator(
+    task_id='EIA814Transform',
+    python_callable=transformTask,
+    provide_context=True,
+    dag=dagEIA814MonthlyData)
+
+
+load = PythonOperator(
+    task_id='EIA814Load',
+    python_callable=loadTask,
+    provide_context=True,
+    dag=dagEIA814MonthlyData)
+
+
+extract >> transform >> load
