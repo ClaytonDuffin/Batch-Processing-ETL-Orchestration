@@ -305,3 +305,20 @@ createTable("energy_and_weather_data",
              "soil_moisture_7_to_28cm": "FLOAT",
              "soil_moisture_28_to_100cm": "FLOAT",
              "soil_moisture_100_to_255cm": "FLOAT"})
+
+
+createTable("energy_and_weather_data",
+            "EIA814_cleaned_monthly_crude_oil_imports", 
+            {"date": "TIMESTAMP",
+             "origin_id": "TEXT",
+             "origin_name": "TEXT",
+             "origin_type": "TEXT",
+             "origin_type_name": "TEXT",
+             "destination_id": "TEXT",
+             "destination_name": "TEXT",
+             "destination_type": "TEXT",
+             "destination_type_name": "TEXT",
+             "grade_id": "TEXT",
+             "grade_name": "TEXT",
+             "quantity": "FLOAT",
+             "quantity_units": "TEXT"})
