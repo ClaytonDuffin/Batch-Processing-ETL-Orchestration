@@ -15,7 +15,7 @@ load_dotenv()
 # Initialize PostgreSQL tables. Insert to tables.
 # Define DAG and components following the same structure as the other pipelines. Extract data at the midpoint of each quarter.
 
-def harvestMSH70002AndEIA7aFormData(endpoint, errorMessage, offset):
+def harvestMSHA70002AndEIA7AFormData(endpoint, errorMessage, offset):
 
     url = f"https://api.eia.gov/v2/coal/{endpoint}/data"
                     
@@ -56,7 +56,7 @@ def paginationCycler(endpoint, errorMessage):
 
     while True:
         try:
-            dataJSON = harvestMSH70002AndEIA7aFormData(endpoint, errorMessage, offset)
+            dataJSON = harvestMSHA70002AndEIA7AFormData(endpoint, errorMessage, offset)
             allCalls.append(dataJSON)
 
             if len(dataJSON['response']['data']) == 0:
