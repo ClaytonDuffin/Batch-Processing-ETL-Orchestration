@@ -79,6 +79,5 @@ monthlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to 
 
 # transform
 
-
 # load
 
