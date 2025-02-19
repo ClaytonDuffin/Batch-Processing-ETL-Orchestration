@@ -74,8 +74,8 @@ def paginationCycler(endpoint, errorMessage):
 
 
 # extract
-monthlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
-monthlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
+quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
+quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
 
 # transform
 
