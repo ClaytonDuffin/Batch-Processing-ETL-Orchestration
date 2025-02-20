@@ -10,7 +10,6 @@ from psycopg2.extras import execute_values
 load_dotenv()
 
 # TODO
-# Clean and restructure data.
 # Identify and implement transformations.
 # Initialize PostgreSQL tables. Insert to tables.
 # Define DAG and components following the same structure as the other pipelines. Extract data at the midpoint of each quarter.
@@ -73,11 +72,33 @@ def paginationCycler(endpoint, errorMessage):
     return allCalls
 
 
+def cleanQuarterlyData(quarterlyData):
+    
+    twoQuartersAgo = f"{(dt := datetime.now() - relativedelta(months=6)).year}-Q{(dt.month - 1) // 3 + 1}"
+    
+    combinedData = (pd.concat([pd.DataFrame(entry['response']['data']) for entry in quarterlyData], ignore_index=True)
+                    .rename(columns={'period': 'date'})
+                    .dropna(subset=['price'])
+                    .loc[lambda df: pd.to_numeric(df['price'], errors='coerce').notna()]
+                    .assign(date=lambda df: pd.to_datetime(df['date'], errors='coerce'))
+                    .reset_index(drop=True))
+        
+    if 'customsDistrictId' in set(combinedData.columns):
+        modifiedData = (combinedData.query('customsDistrictDescription != "Total"'))
+    else:
+        modifiedData = (combinedData.fillna({'mineCountyName': 'Not Specified'}))
+        
+    modifiedData = modifiedData[modifiedData['date'].dt.to_period('Q') == twoQuartersAgo]
+    
+    return modifiedData
+
 # extract
 quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
 quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
 
 # transform
+cleanedQuarterlyCoalImportsAndExports = cleanQuarterlyData(quarterlyCoalImportsAndExports)
+cleanedQuarterlyCoalShipmentReceipts = cleanQuarterlyData(quarterlyCoalShipmentReceipts)
 
 # load
 
