@@ -72,7 +72,7 @@ def paginationCycler(endpoint, errorMessage):
     return allCalls
 
 
-def cleanQuarterlyData(quarterlyData):
+def cleaner(quarterlyData):
     
     twoQuartersAgo = f"{(dt := datetime.now() - relativedelta(months=6)).year}-Q{(dt.month - 1) // 3 + 1}"
     
@@ -97,8 +97,8 @@ quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-pric
 quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
 
 # transform
-cleanedQuarterlyCoalImportsAndExports = cleanQuarterlyData(quarterlyCoalImportsAndExports)
-cleanedQuarterlyCoalShipmentReceipts = cleanQuarterlyData(quarterlyCoalShipmentReceipts)
+cleanedQuarterlyCoalImportsAndExports = cleaner(quarterlyCoalImportsAndExports)
+cleanedQuarterlyCoalShipmentReceipts = cleaner(quarterlyCoalShipmentReceipts)
 
 # load
 
