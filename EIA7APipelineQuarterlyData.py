@@ -7,12 +7,10 @@ import pandas as pd
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import execute_values
+from airflow import DAG
+from airflow.operators.python import PythonOperator
 load_dotenv()
 
-# TODO
-# Identify and implement transformations.
-# Initialize PostgreSQL tables. Insert to tables.
-# Define DAG and components following the same structure as the other pipelines. Extract data at the midpoint of each quarter.
 
 def harvestMSHA70002AndEIA7AFormData(endpoint, errorMessage, offset):
 
@@ -92,13 +90,111 @@ def cleaner(quarterlyData):
     
     return modifiedData
 
-# extract
-quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
-quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
 
-# transform
-cleanedQuarterlyCoalImportsAndExports = cleaner(quarterlyCoalImportsAndExports)
-cleanedQuarterlyCoalShipmentReceipts = cleaner(quarterlyCoalShipmentReceipts)
+def renameColumnsToSnakeCase(transformedDataFrame):
+    
+    def toSnakeCase(colName):
+        colName = re.sub(r'[-\s/]+', '_', colName)
+        colName = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', colName)
+        return colName.lower()
 
-# load
+    transformedDataFrame.columns = [toSnakeCase(col) for col in transformedDataFrame.columns]
 
+    return transformedDataFrame
+
+
+def loadToPostgreSQL(tableName, transformedData):
+
+    columnNames = transformedData.columns.tolist()
+
+    try:
+        connection = psycopg2.connect(dbname='energy_and_weather_data', host='localhost', port='5432')
+        cursor = connection.cursor()
+
+        query = f"""
+        INSERT INTO {tableName} ({', '.join(columnNames)})
+        VALUES %s
+        """
+
+        values = [tuple(row) for row in transformedData[columnNames].values]
+        execute_values(cursor, query, values)
+        connection.commit()
+
+    except Exception as e:
+        raise Exception(f"Error occurred for table {tableName} while loading {transformedData}: {e}")
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def extractTask(**kwargs):  
+    
+    taskInstance = kwargs['ti'] 
+    
+    quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
+    quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
+
+    taskInstance.xcom_push(key='quarterlyCoalImportsAndExports', value=quarterlyCoalImportsAndExports)  
+    taskInstance.xcom_push(key='quarterlyCoalShipmentReceipts', value=quarterlyCoalShipmentReceipts)
+    
+    
+def transformTask(**kwargs):  
+
+    taskInstance = kwargs['ti']  
+    
+    quarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='extractTask', key='quarterlyCoalImportsAndExports')
+    quarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='extractTask', key='quarterlyCoalShipmentReceipts')
+
+    cleanedQuarterlyCoalImportsAndExports = renameColumnsToSnakeCase(cleaner(quarterlyCoalImportsAndExports))
+    cleanedQuarterlyCoalShipmentReceipts = renameColumnsToSnakeCase(cleaner(quarterlyCoalShipmentReceipts))
+
+    taskInstance.xcom_push(key='cleanedQuarterlyCoalImportsAndExports', value=cleanedQuarterlyCoalImportsAndExports)
+    taskInstance.xcom_push(key='cleanedQuarterlyCoalShipmentReceipts', value=cleanedQuarterlyCoalShipmentReceipts)
+
+
+def loadTask(**kwargs):  
+    
+    taskInstance = kwargs['ti']  
+    
+    cleanedQuarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedQuarterlyCoalImportsAndExports')  
+    cleanedQuarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedQuarterlyCoalShipmentReceipts')
+
+    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_imports_and_exports', cleanedQuarterlyCoalImportsAndExports)
+    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_shipment_receipts', cleanedQuarterlyCoalShipmentReceipts)
+    
+
+dagEIA7AQuarterlyData = DAG(
+    'EIA7APipelineQuarterlyData',
+    default_args={
+        'owner': 'airflow',
+        'start_date': datetime(2025, 1, 31),
+        'retries': 2,
+        'retry_delay': timedelta(minutes=15)},
+    description='DAG to extract, transform, and load EIA-7A and MSHA 7000-2 form quarterly data. Scheduled to run once per quarter, at midnight, on March 15th, June 15th, September 15th, and December 15th.',
+    schedule_interval='0 0 15 3,6,9,12 *',
+    catchup=False)
+
+
+extract = PythonOperator(
+    task_id='EIA7AExtract',
+    python_callable=extractTask,
+    provide_context=True,
+    dag=dagEIA7AQuarterlyData)
+
+
+transform = PythonOperator(
+    task_id='EIA7ATransform',
+    python_callable=transformTask,
+    provide_context=True,
+    dag=dagEIA7AQuarterlyData)
+
+
+load = PythonOperator(
+    task_id='EIA7ALoad',
+    python_callable=loadTask,
+    provide_context=True,
+    dag=dagEIA7AQuarterlyData)
+
+
+extract >> transform >> load
