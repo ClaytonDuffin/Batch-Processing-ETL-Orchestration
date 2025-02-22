@@ -267,7 +267,7 @@ dagEIA930HourlyData = DAG(
         'retries': 2,
         'retry_delay': timedelta(minutes=15)},
     description='DAG to extract, transform, and load EIA-930 form hourly data, and EIA-930 form reference tables. Scheduled to run once per day.',
-    schedule_interval=timedelta(days=1),
+    schedule_interval='0 1 * * *',
     catchup=False)
 
 
