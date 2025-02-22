@@ -177,7 +177,7 @@ dagOpenMeteoHourlyData = DAG(
         'retries': 2,
         'retry_delay': timedelta(minutes=15)},
     description='DAG to extract, transform, and load weather data. Scheduled to run once per day.',
-    schedule_interval=timedelta(days=1),
+    schedule_interval='0 1 * * *',
     catchup=False)
 
 
