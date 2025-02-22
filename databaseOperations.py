@@ -3,24 +3,31 @@ import psycopg2
 
 def createDatabase(databaseName):
 
-    with psycopg2.connect(dbname="postgres") as connection:
+    try:
+        connection = psycopg2.connect(dbname="postgres", host='postgres', port='5432', user='airflow', password='airflow')
         connection.autocommit = True
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (databaseName,))
-            if not cursor.fetchone():
-                cursor.execute(f"CREATE DATABASE {databaseName}")
-                print(f"Database '{databaseName}' created successfully!")
-                cursor.close()
-                connection.close()
-            else:
-                print(f"Database '{databaseName}' already exists.")
-                cursor.close()
-                connection.close()
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (databaseName,))
+        
+        if not cursor.fetchone():
+            cursor.execute(f"CREATE DATABASE {databaseName}")
+            print(f"Database '{databaseName}' created successfully!")
+        else:
+            print(f"Database '{databaseName}' already exists.")
+    
+    except Exception as e:
+        print(f"Error occurred: {e}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 
 def createTable(databaseName, tableName, tableColumnNames):
     
-    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
+    connection = psycopg2.connect(dbname=databaseName, host='postgres', port='5432', user='airflow', password='airflow')
     cursor = connection.cursor()
     
     columnNames = ", ".join([f"{col} {dtype}" for col, dtype in tableColumnNames.items()])
@@ -33,14 +40,33 @@ def createTable(databaseName, tableName, tableColumnNames):
     
     cursor.execute(query)
     connection.commit()
-    print(f"Table '{tableName}' created successfully!")
+    print(f"Table '{tableName}' is ready!")
+    cursor.close()
+    connection.close()
+
+
+def displayAllTableNames(databaseName):
+    
+    connection = psycopg2.connect(dbname=databaseName, host='postgres', port='5432', user='airflow', password='airflow')
+    cursor = connection.cursor()
+    
+    cursor.execute("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public';
+    """)
+    tables = cursor.fetchall()
+    
+    for table in tables:
+        print(table[0])
+    
     cursor.close()
     connection.close()
 
 
 def displayTableContents(databaseName, tableName, numberOfRowsToDisplay=5):
     
-    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
+    connection = psycopg2.connect(dbname=databaseName, host='postgres', port='5432', user='airflow', password='airflow')
     cursor = connection.cursor()
 
     query = f"""
@@ -57,10 +83,36 @@ def displayTableContents(databaseName, tableName, numberOfRowsToDisplay=5):
     cursor.close()
     connection.close()
 
+        
+def removeAllTablesfromDatabase(databaseName):
+    
+    connection = psycopg2.connect(dbname=databaseName, host='postgres', port='5432', user='airflow', password='airflow')
+    cursor = connection.cursor()
+    
+    cursor.execute("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public';
+    """)
+    
+    tables = cursor.fetchall()
+    
+    for table in tables:
+        table_name = table[0]
+        try:
+            cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
+            print(f"Table {table_name} has been removed.")
+        except Exception as e:
+            print(f"Error removing table {table_name}: {e}")
+    
+    connection.commit()
+    cursor.close()
+    connection.close()
+
 
 def deleteTableContents(databaseName, tableName):
     
-    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
+    connection = psycopg2.connect(dbname=databaseName, host='postgres', port='5432', user='airflow', password='airflow')
     cursor = connection.cursor()
 
     query = f"DELETE FROM {tableName}"
@@ -70,51 +122,6 @@ def deleteTableContents(databaseName, tableName):
 
     print(f"Contents have been deleted from {tableName}.")
 
-    cursor.close()
-    connection.close()
-
-
-def displayAllTableNames(databaseName):
-    
-    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
-    cursor = connection.cursor()
-    
-    cursor.execute("""
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'public';
-    """)
-    tables = cursor.fetchall()
-    
-    for table in tables:
-        print(table[0])
-    
-    cursor.close()
-    connection.close()
-
-        
-def removeAllTablesfromDatabase(databaseName):
-    
-    connection = psycopg2.connect(dbname=databaseName, host='localhost', port='5432')
-    cursor = connection.cursor()
-    
-    cursor.execute("""
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'public';
-    """)
-    
-    tables = cursor.fetchall()
-    
-    for table in tables:
-        tableName = table[0]
-        try:
-            cursor.execute(f"DROP TABLE IF EXISTS {tableName};")
-            print(f"Table {tableName} has been removed.")
-        except Exception as e:
-            print(f"Error removing table {tableName}: {e}")
-    
-    connection.commit()
     cursor.close()
     connection.close()
 
@@ -322,3 +329,53 @@ createTable("energy_and_weather_data",
              "grade_name": "TEXT",
              "quantity": "FLOAT",
              "quantity_units": "TEXT"})
+
+
+createTable("energy_and_weather_data",
+            "EIA7A_cleaned_quarterly_coal_imports_and_exports", 
+            {"date": "TIMESTAMP",
+             "export_import_type": "TEXT",
+             "coal_rank_id": "TEXT",
+             "coal_rank_description": "TEXT",
+             "country_id": "TEXT",
+             "country_description": "TEXT",
+             "customs_district_id": "TEXT",
+             "customs_district_description": "TEXT",
+             "price": "FLOAT",
+             "quantity": "FLOAT",
+             "price_units": "TEXT",
+             "quantity_units": "TEXT"})
+
+
+createTable("energy_and_weather_data",
+            "EIA7A_cleaned_quarterly_coal_shipment_receipts", 
+            {"date": "TIMESTAMP",
+             "plant_state_id": "TEXT",
+             "plant_state_description": "TEXT",
+             "mine_state_id": "TEXT",
+             "mine_state_description": "TEXT",
+             "mine_type_id": "TEXT",
+             "mine_type_description": "TEXT",
+             "mine_mshaid": "INT",
+             "mine_name": "TEXT",
+             "mine_basin_id": "TEXT",
+             "mine_basin_description": "TEXT",
+             "mine_county_id": "INT",
+             "mine_county_name": "TEXT",
+             "contract_type": "TEXT",
+             "transportation_mode": "TEXT",
+             "coal_supplier": "TEXT",
+             "coal_rank_id": "TEXT",
+             "coal_rank_description": "TEXT",
+             "plant_id": "INT",
+             "plant_name": "TEXT",
+             "ash_content": "FLOAT",
+             "heat_content": "FLOAT",
+             "price": "FLOAT",
+             "quantity": "FLOAT",
+             "sulfur_content": "FLOAT",
+             "ash_content_units": "TEXT",
+             "heat_content_units": "TEXT",
+             "price_units": "TEXT",
+             "quantity_units": "TEXT",
+             "sulfur_content_units": "TEXT"})
