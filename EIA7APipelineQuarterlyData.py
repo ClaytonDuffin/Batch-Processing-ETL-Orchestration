@@ -1,5 +1,6 @@
 import os
 import re
+import pickle
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import requests
@@ -108,7 +109,7 @@ def loadToPostgreSQL(tableName, transformedData):
     columnNames = transformedData.columns.tolist()
 
     try:
-        connection = psycopg2.connect(dbname='energy_and_weather_data', host='localhost', port='5432')
+        connection = psycopg2.connect(dbname="energy_and_weather_data", host='postgres', port='5432', user='airflow', password='airflow')
         cursor = connection.cursor()
 
         query = f"""
@@ -128,12 +129,26 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.close()
 
 
+def serializationProcess(dataObject):
+    
+    serializedData = pickle.dumps(dataObject).hex()
+    
+    return serializedData
+    
+
+def deserializationProcess(serializedData):
+    
+    dataObject = pickle.loads(bytes.fromhex(serializedData))
+    
+    return dataObject
+    
+
 def extractTask(**kwargs):  
     
     taskInstance = kwargs['ti'] 
     
-    quarterlyCoalImportsAndExports = paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'")
-    quarterlyCoalShipmentReceipts = paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'")
+    quarterlyCoalImportsAndExports = serializationProcess(paginationCycler('exports-imports-quantity-price', "Unable to harvest data for 'Coal Imports and Exports (Including Price, Quantity, Country, Rank, and Customs District).'"))
+    quarterlyCoalShipmentReceipts = serializationProcess(paginationCycler('shipments/receipts', "Unable to harvest data for 'Coal Shipment Receipts (Detailed by Transportation Type, Supplier, Mine, Coal Basin, County, State, Rank, Contract Type, Price, Quantity, and Quality).'"))
 
     taskInstance.xcom_push(key='quarterlyCoalImportsAndExports', value=quarterlyCoalImportsAndExports)  
     taskInstance.xcom_push(key='quarterlyCoalShipmentReceipts', value=quarterlyCoalShipmentReceipts)
@@ -143,11 +158,11 @@ def transformTask(**kwargs):
 
     taskInstance = kwargs['ti']  
     
-    quarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='extractTask', key='quarterlyCoalImportsAndExports')
-    quarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='extractTask', key='quarterlyCoalShipmentReceipts')
+    quarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='EIA7AExtract', key='quarterlyCoalImportsAndExports')
+    quarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='EIA7AExtract', key='quarterlyCoalShipmentReceipts')
 
-    cleanedQuarterlyCoalImportsAndExports = renameColumnsToSnakeCase(cleaner(quarterlyCoalImportsAndExports))
-    cleanedQuarterlyCoalShipmentReceipts = renameColumnsToSnakeCase(cleaner(quarterlyCoalShipmentReceipts))
+    cleanedQuarterlyCoalImportsAndExports = serializationProcess(renameColumnsToSnakeCase(cleaner(deserializationProcess(quarterlyCoalImportsAndExports))))
+    cleanedQuarterlyCoalShipmentReceipts = serializationProcess(renameColumnsToSnakeCase(cleaner(deserializationProcess(quarterlyCoalShipmentReceipts))))
 
     taskInstance.xcom_push(key='cleanedQuarterlyCoalImportsAndExports', value=cleanedQuarterlyCoalImportsAndExports)
     taskInstance.xcom_push(key='cleanedQuarterlyCoalShipmentReceipts', value=cleanedQuarterlyCoalShipmentReceipts)
@@ -157,11 +172,11 @@ def loadTask(**kwargs):
     
     taskInstance = kwargs['ti']  
     
-    cleanedQuarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedQuarterlyCoalImportsAndExports')  
-    cleanedQuarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedQuarterlyCoalShipmentReceipts')
+    cleanedQuarterlyCoalImportsAndExports = taskInstance.xcom_pull(task_ids='EIA7ATransform', key='cleanedQuarterlyCoalImportsAndExports')  
+    cleanedQuarterlyCoalShipmentReceipts = taskInstance.xcom_pull(task_ids='EIA7ATransform', key='cleanedQuarterlyCoalShipmentReceipts')
 
-    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_imports_and_exports', cleanedQuarterlyCoalImportsAndExports)
-    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_shipment_receipts', cleanedQuarterlyCoalShipmentReceipts)
+    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_imports_and_exports', deserializationProcess(cleanedQuarterlyCoalImportsAndExports))
+    loadToPostgreSQL('EIA7A_cleaned_quarterly_coal_shipment_receipts', deserializationProcess(cleanedQuarterlyCoalShipmentReceipts))
     
 
 dagEIA7AQuarterlyData = DAG(
