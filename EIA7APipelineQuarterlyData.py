@@ -187,7 +187,7 @@ dagEIA7AQuarterlyData = DAG(
         'retries': 2,
         'retry_delay': timedelta(minutes=15)},
     description='DAG to extract, transform, and load EIA-7A and MSHA 7000-2 form quarterly data. Scheduled to run once per quarter, at midnight, on March 15th, June 15th, September 15th, and December 15th.',
-    schedule_interval='0 0 15 3,6,9,12 *',
+    schedule_interval='0 0 15 1,4,7,10 *',
     catchup=False)
 
 
