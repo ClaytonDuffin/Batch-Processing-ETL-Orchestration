@@ -14,7 +14,7 @@ This is an ongoing project that began in late January of 2025. The goal of this 
 
 Due to the nature of the data sources, the pipelines extract data at varying intervals. Some pipelines extract data daily, while others only extract data once per month. In order to orchestrate these tasks accordingly, multiple directed acyclic graphs (DAGs) are used, via Apache Airflow. One DAG for each pipeline. Data flows to PostgreSQL after extracting, cleaning, restructuring, and transforming it. The data can then be queried from PostgreSQL for visualization and analysis.
 
-![AirflowUI](https://github.com/user-attachments/assets/06c67691-057b-467e-bae2-c7f6f3ad68e5)
+![AirflowUI](https://github.com/user-attachments/assets/44005c02-ca52-403b-928c-8d43808eb752)
 
 ## Pipeline Architecture <a name = "piparc"></a>
 ![PipelineArchitecture](https://github.com/user-attachments/assets/c2f5e4c0-cd6e-44a9-92b2-d0dca3a756e4)
