@@ -1,5 +1,6 @@
 import os
 import re
+import pickle
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import requests
@@ -84,7 +85,7 @@ def loadToPostgreSQL(tableName, transformedData):
     columnNames = transformedData.columns.tolist()
 
     try:
-        connection = psycopg2.connect(dbname='energy_and_weather_data', host='localhost', port='5432')
+        connection = psycopg2.connect(dbname="energy_and_weather_data", host='postgres', port='5432', user='airflow', password='airflow')
         cursor = connection.cursor()
 
         query = f"""
@@ -102,28 +103,42 @@ def loadToPostgreSQL(tableName, transformedData):
     finally:
         cursor.close()
         connection.close()
+        
+
+def serializationProcess(dataObject):
+    
+    serializedData = pickle.dumps(dataObject).hex()
+    
+    return serializedData
+    
+
+def deserializationProcess(serializedData):
+    
+    dataObject = pickle.loads(bytes.fromhex(serializedData))
+    
+    return dataObject
 
 
 def extractTask(**kwargs):  
     
     taskInstance = kwargs['ti']  
-    monthlyCrudeOilImports = paginationCycler()  
+    monthlyCrudeOilImports = serializationProcess(paginationCycler())
     taskInstance.xcom_push(key='monthlyCrudeOilImports', value=monthlyCrudeOilImports)  
     
     
 def transformTask(**kwargs):  
 
     taskInstance = kwargs['ti']  
-    monthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='extractTask', key='monthlyCrudeOilImports')
-    cleanedMonthlyCrudeOilImports = renameColumnsToSnakeCase(cleaner(monthlyCrudeOilImports))
+    monthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='EIA814Extract', key='monthlyCrudeOilImports')
+    cleanedMonthlyCrudeOilImports = serializationProcess(renameColumnsToSnakeCase(cleaner(deserializationProcess(monthlyCrudeOilImports))))
     taskInstance.xcom_push(key='cleanedMonthlyCrudeOilImports', value=cleanedMonthlyCrudeOilImports)  
 
 
 def loadTask(**kwargs):  
     
     taskInstance = kwargs['ti']  
-    cleanedMonthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedMonthlyCrudeOilImports')  
-    loadToPostgreSQL('EIA814_cleaned_monthly_crude_oil_imports', cleanedMonthlyCrudeOilImports)
+    cleanedMonthlyCrudeOilImports = taskInstance.xcom_pull(task_ids='EIA814Transform', key='cleanedMonthlyCrudeOilImports')  
+    loadToPostgreSQL('EIA814_cleaned_monthly_crude_oil_imports', deserializationProcess(cleanedMonthlyCrudeOilImports))
 
 
 dagEIA814MonthlyData = DAG(
