@@ -4,6 +4,7 @@ RUN pip install --no-cache-dir \
     psycopg2-binary \
     openmeteo_requests \
     requests_cache \
+    openpyxl \
     retry_requests
 
 COPY databaseOperations.py /databaseOperations.py
