@@ -1,3 +1,4 @@
+import pickle
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
@@ -111,7 +112,7 @@ def loadToPostgreSQL(tableName, transformedData):
     columnNames = transformedData.columns.tolist()
 
     try:
-        connection = psycopg2.connect(dbname='energy_and_weather_data', host='localhost', port='5432')
+        connection = psycopg2.connect(dbname="energy_and_weather_data", host='postgres', port='5432', user='airflow', password='airflow')
         cursor = connection.cursor()
 
         query = f"""
@@ -131,11 +132,25 @@ def loadToPostgreSQL(tableName, transformedData):
         connection.close()
 
 
+def serializationProcess(dataObject):
+    
+    serializedData = pickle.dumps(dataObject).hex()
+    
+    return serializedData
+    
+
+def deserializationProcess(serializedData):
+    
+    dataObject = pickle.loads(bytes.fromhex(serializedData))
+    
+    return dataObject
+
+
 def extractTask(**kwargs):  
     
     taskInstance = kwargs['ti']  
     
-    weatherAtCoordinates = coordinateCycler()  
+    weatherAtCoordinates = serializationProcess(coordinateCycler())
     
     taskInstance.xcom_push(key='weatherAtCoordinates', value=weatherAtCoordinates)  
     
@@ -144,12 +159,16 @@ def transformTask(**kwargs):
 
     taskInstance = kwargs['ti']  
 
-    weatherAtCoordinates = taskInstance.xcom_pull(task_ids='extractTask', key='weatherAtCoordinates')
+    weatherAtCoordinates = taskInstance.xcom_pull(task_ids='OpenMeteoExtract', key='weatherAtCoordinates')
 
-    cleanedWeatherAtCoordinates = cleaner(weatherAtCoordinates)  
+    cleanedWeatherAtCoordinates = cleaner(deserializationProcess(weatherAtCoordinates))  
     
     transformedStateMeansPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'mean')
     transformedStateStandardDeviationsPerHour = computeMetricsPerStatePerHour(cleanedWeatherAtCoordinates, 'std')
+    
+    cleanedWeatherAtCoordinates = serializationProcess(cleanedWeatherAtCoordinates)
+    transformedStateMeansPerHour = serializationProcess(transformedStateMeansPerHour)
+    transformedStateStandardDeviationsPerHour = serializationProcess(transformedStateStandardDeviationsPerHour)
 
     taskInstance.xcom_push(key='cleanedWeatherAtCoordinates', value=cleanedWeatherAtCoordinates)  
     taskInstance.xcom_push(key='transformedStateMeansPerHour', value=transformedStateMeansPerHour)  
@@ -160,13 +179,13 @@ def loadTask(**kwargs):
     
     taskInstance = kwargs['ti']  
 
-    cleanedWeatherAtCoordinates = taskInstance.xcom_pull(task_ids='transformTask', key='cleanedWeatherAtCoordinates')  
-    transformedStateMeansPerHour = taskInstance.xcom_pull(task_ids='transformTask', key='transformedStateMeansPerHour')  
-    transformedStateStandardDeviationsPerHour = taskInstance.xcom_pull(task_ids='transformTask', key='transformedStateStandardDeviationsPerHour')  
+    cleanedWeatherAtCoordinates = taskInstance.xcom_pull(task_ids='OpenMeteoTransform', key='cleanedWeatherAtCoordinates')  
+    transformedStateMeansPerHour = taskInstance.xcom_pull(task_ids='OpenMeteoTransform', key='transformedStateMeansPerHour')  
+    transformedStateStandardDeviationsPerHour = taskInstance.xcom_pull(task_ids='OpenMeteoTransform', key='transformedStateStandardDeviationsPerHour')  
    
-    loadToPostgreSQL('openmeteo_cleaned_weather', cleanedWeatherAtCoordinates)  
-    loadToPostgreSQL('openmeteo_weather_means_per_hour', transformedStateMeansPerHour)  
-    loadToPostgreSQL('openmeteo_weather_deviations_per_hour', transformedStateStandardDeviationsPerHour)
+    loadToPostgreSQL('openmeteo_cleaned_weather', deserializationProcess(cleanedWeatherAtCoordinates))
+    loadToPostgreSQL('openmeteo_weather_means_per_hour', deserializationProcess(transformedStateMeansPerHour))
+    loadToPostgreSQL('openmeteo_weather_deviations_per_hour', deserializationProcess(transformedStateStandardDeviationsPerHour))
 
 
 dagOpenMeteoHourlyData = DAG(
