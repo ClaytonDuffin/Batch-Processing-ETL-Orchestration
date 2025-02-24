@@ -8,7 +8,7 @@
 
 ## Project Overview <a name = "proove"></a>
 
-This is an ongoing project that began in late January of 2025. The goal of this project is to define a system for compiling U.S. energy and weather data, for visualization and analysis. The main focus is pulling data from online sources, transforming it, and then sending it to a PostgreSQL database.
+This project defines a system for compiling U.S. energy and weather data, for visualization and analysis. The main focus is extracting data from online sources, cleaning and transforming it, and then loading it into a PostgreSQL database.
 
 ## Orchestration Requirement <a name = "orcreq"></a>
 
