@@ -16,9 +16,9 @@ This project defines a system for compiling U.S. energy and weather data, for vi
 
 1. [Register for a free API key](https://www.eia.gov/opendata/register.php) from the U.S. Energy Information Administration (EIA). No API key is required to access the weather data from Open-Meteo.
 
-2. Next, [download and install Docker Desktop](https://docs.docker.com/desktop/?_gl=1*1259ys3*_gcl_au*MTY5MTg5ODA4NS4xNzM5ODYyOTQz*_ga*OTQyOTY1NzAzLjE3Mzk4NTE5Nzk.*_ga_XJWPQMJYHQ*MTc0MTEwMzgzNC43LjEuMTc0MTEwMzkzNi40OS4wLjA.).
+2. [Download and install Docker Desktop](https://docs.docker.com/desktop/?_gl=1*1259ys3*_gcl_au*MTY5MTg5ODA4NS4xNzM5ODYyOTQz*_ga*OTQyOTY1NzAzLjE3Mzk4NTE5Nzk.*_ga_XJWPQMJYHQ*MTc0MTEwMzgzNC43LjEuMTc0MTEwMzkzNi40OS4wLjA.).
 
-3. After that, clone this repository, and navigate into the cloned directory with the following command:
+3. Next, clone this repository, and navigate into the cloned directory with the following command:
 ```
 git clone https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration.git && cd Batch-Processing-ETL-Orchestration
 ```
@@ -61,16 +61,19 @@ Data is curently sourced from two providers. [The U.S. Energy Information Admini
 Listed below are the pipelines, with descriptions and properties, categorized by provider.
 
 **U.S. Energy Information Administration (EIA)**
+
 `EIA-7A Pipeline`
   * Extracts, transforms, and loads EIA-7A and MSHA 7000-2 form data (quarterly data).
   * Scheduled to run once per quarter, at midnight, on January 15th, April 15th, July 15th, and October 15th.
   * Data lags by 2 quarters.
   * Extracted data includes coal imports, exports, and shipment receipts.
+
 `EIA-814 Pipeline`
   * Extracts, transforms, and loads EIA-814 form data (monthly data). 
   * Scheduled to run once per month, on the 15th, at midnight.
   * Data lags by 3 months.
   * Extracted data includes crude oil imports.
+
 `EIA-930 Pipeline`
   * Extracts, transforms, and loads EIA-930 form data (hourly data).
   * Scheduled to run at 1 a.m. daily.
@@ -78,6 +81,7 @@ Listed below are the pipelines, with descriptions and properties, categorized by
   * Extracted data includes electricity demand, day-ahead demand forecast, net generation, and interchange, by balancing authority.
 
 **Open-Meteo**
+
 `Historical Weather Pipeline`
   * Extracts, transforms, and loads Open-Meteo weather data (hourly data).
   * Scheduled to run at 1 a.m. daily. 
