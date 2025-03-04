@@ -28,7 +28,7 @@ git clone https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration.gi
 export AIRFLOW_UID=501 EIA_API_KEY="Enter Your API Key Here."
 ```
 
-&emsp;&emsp;For a local deployment, create a `.env` file inside the local directory, and in it, add and save these two lines, inputting your own API key:
+&emsp;&emsp;For a local deployment, create a `.env` file inside the local directory, and in it, add and save these two lines, &emsp;&emsp;inputting your own API key:
 ```
 AIRFLOW_UID=501
 EIA_API_KEY="Enter Your API Key Here."
