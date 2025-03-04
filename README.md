@@ -23,7 +23,8 @@ This project defines a system for compiling U.S. energy and weather data, for vi
 git clone https://github.com/ClaytonDuffin/Batch-Processing-ETL-Orchestration.git && cd Batch-Processing-ETL-Orchestration
 ```
 
-4. For a cloud deployment, set environment variables directly by running this command, after first inputting your own API key:
+4.
+For a cloud deployment, set environment variables directly by running this command, after first inputting your own API key:
 ```
 export AIRFLOW_UID=501 EIA_API_KEY="Enter Your API Key Here."
 ```
