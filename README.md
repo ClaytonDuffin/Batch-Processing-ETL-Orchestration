@@ -62,27 +62,27 @@ Listed below are the pipelines, with descriptions and properties, categorized by
 
 **U.S. Energy Information Administration (EIA)**
 `EIA-7A Pipeline`
-    * Extracts, transforms, and loads EIA-7A and MSHA 7000-2 form data (quarterly data).
-    * Scheduled to run once per quarter, at midnight, on January 15th, April 15th, July 15th, and October 15th.
-    * Data lags by 2 quarters.
-    * Extracted data includes coal imports, exports, and shipment receipts.
+  * Extracts, transforms, and loads EIA-7A and MSHA 7000-2 form data (quarterly data).
+  * Scheduled to run once per quarter, at midnight, on January 15th, April 15th, July 15th, and October 15th.
+  * Data lags by 2 quarters.
+  * Extracted data includes coal imports, exports, and shipment receipts.
 `EIA-814 Pipeline`
-    * Extracts, transforms, and loads EIA-814 form data (monthly data). 
-    * Scheduled to run once per month, on the 15th, at midnight.
-    * Data lags by 3 months.
-    * Extracted data includes crude oil imports.
+  * Extracts, transforms, and loads EIA-814 form data (monthly data). 
+  * Scheduled to run once per month, on the 15th, at midnight.
+  * Data lags by 3 months.
+  * Extracted data includes crude oil imports.
 `EIA-930 Pipeline`
-    * Extracts, transforms, and loads EIA-930 form data (hourly data).
-    * Scheduled to run at 1 a.m. daily.
-    * Data lags by 3 calendar days.
-    * Extracted data includes electricity demand, day-ahead demand forecast, net generation, and interchange, by balancing authority.
+  * Extracts, transforms, and loads EIA-930 form data (hourly data).
+  * Scheduled to run at 1 a.m. daily.
+  * Data lags by 3 calendar days.
+  * Extracted data includes electricity demand, day-ahead demand forecast, net generation, and interchange, by balancing authority.
 
 **Open-Meteo**
 `Historical Weather Pipeline`
-    * Extracts, transforms, and loads Open-Meteo weather data (hourly data).
-    * Scheduled to run at 1 a.m. daily. 
-    * Data lags by 7 calendar days.
-    * Extracted data includes 30 weather variables, at each of the 150 curated coordinates. 
+  * Extracts, transforms, and loads Open-Meteo weather data (hourly data).
+  * Scheduled to run at 1 a.m. daily. 
+  * Data lags by 7 calendar days.
+  * Extracted data includes 30 weather variables, at each of the 150 curated coordinates. 
 
 ## Orchestration Requirement <a name = "orcreq"></a>
 
