@@ -126,6 +126,7 @@ def deleteTableContents(databaseName, tableName):
     connection.close()
 
 
+createDatabase("airflow")
 createDatabase("energy_and_weather_data")
 
 
